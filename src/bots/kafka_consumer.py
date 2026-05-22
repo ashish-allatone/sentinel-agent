@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
 KAFKA_CONFIG = {
     "bootstrap.servers": os.environ.get("KAFKA_BOOTSTRAP_SERVER"),
     "group.id": "sentinel-consumer-group",
@@ -83,8 +82,15 @@ class KafkaConsumerService:
         parsed_messages = []
 
         for msg in messages:
-            data = orjson.loads(msg.value())
-
+            try:
+                raw = msg.value()
+                if not raw:
+                    continue
+                data = orjson.loads(raw)
+            except Exception as parse_err:
+                print(f"Skipping bad message: {parse_err} | raw: {msg.value()}")
+                continue
+            # data = orjson.loads(msg.value())
             # transform into DB format
             parsed_messages.append({
                 "machine_id" : data.get("machine_id"),
@@ -118,7 +124,8 @@ class KafkaConsumerService:
                 "mitre_technique": data.get("mitre_technique"),
                 "notes": data.get("notes"),
             })
-
+        if not parsed_messages:
+            return
         print("inserting")
 
         await self.insert_events_bulk(parsed_messages)

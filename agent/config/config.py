@@ -20,7 +20,7 @@ JSON_LOGS_BASENAME = "logs-of"
 
 DB_USER = "developer"
 DB_PASSWORD = "password"
-DB_ENDPOINT = "172.235.9.36"
+DB_ENDPOINT = "140.245.7.71"
 DB_NAME = "developmentdb"
 
 

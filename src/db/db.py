@@ -50,12 +50,10 @@ Examples:
 
 >>> await create_db_and_tables()
 """
-
 dbuser = os.environ.get("DB_USER")
 dbpassword = os.environ.get("DB_PASSWORD")
 dbendpoint = os.environ.get("DB_ENDPOINT")
 dbname = os.environ.get("DB_NAME")
-
 
 
 

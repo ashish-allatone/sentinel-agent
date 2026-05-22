@@ -15,7 +15,7 @@ class KafkaWriter:
             "linger.ms": 50,
             "batch.num.messages": 1000,
         })
-
+        
     def delivery_report(self, err, msg):
         if err is not None:
             print(f"Kafka delivery failed: {err}")
