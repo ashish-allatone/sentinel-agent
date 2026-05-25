@@ -67,14 +67,21 @@ def _get_file_info(path: str, old_path: str = None, old_sha256: str = None) -> F
                 info.group = str(st.st_gid)
     except (FileNotFoundError, PermissionError, OSError):
         pass
+    # NEW
+    try:
+        if not p.is_file():
+            return None
+        else:
+            # if p.is_file():
+            hashes = hash_file(str(p))
+            info.sha256 = hashes["sha256"]
+            info.sha1   = hashes["sha1"]
+            info.md5    = hashes["md5"]
 
-    if p.is_file():
-        hashes = hash_file(str(p))
-        info.sha256 = hashes["sha256"]
-        info.sha1   = hashes["sha1"]
-        info.md5    = hashes["md5"]
-
-    return info
+            return info
+    except (PermissionError, OSError):
+        return None
+    
 
 
 def _get_current_user() -> UserInfo:
@@ -126,9 +133,10 @@ def _severity_for_path(path: str) -> str:
 # ─────────────────────────────────────────────
 
 class SentinelFileHandler(FileSystemEventHandler):
-    def __init__(self, dispatch: Callable, ignore_dirs: List[str] = None):
+    def __init__(self, dispatch: Callable,machine_info ,  ignore_dirs: List[str] = None):
         super().__init__()
         self._dispatch    = dispatch
+        self.machine_info = machine_info
         self._ignore_dirs = [Path(d).resolve() for d in (ignore_dirs or [])]
         self._hash_cache  = {}  # path → sha256, for detecting actual content changes
 
@@ -150,7 +158,8 @@ class SentinelFileHandler(FileSystemEventHandler):
             old_path  = dst_path if action == EventAction.RENAME else None,
             old_sha256= old_sha  if action == EventAction.UPDATE else None,
         )
-
+        if file_info is None:
+            return
         # Cache new hash
         if file_info.sha256:
             self._hash_cache[src_path] = file_info.sha256
@@ -170,7 +179,7 @@ class SentinelFileHandler(FileSystemEventHandler):
             user       = _get_current_user(),
             tags       = ["filesystem"],
         )
-        self._dispatch(event.to_dict())
+        self._dispatch(event.to_dict() , self.machine_info)
 
     def on_created(self, event):
         if not event.is_directory:
@@ -204,6 +213,7 @@ class FileCollector:
     def __init__(
         self,
         dispatch:    Callable,
+        machine_info: dict,
         watch_paths: List[str] = None,
         ignore_dirs: List[str] = None,
         recursive:   bool      = True,
@@ -218,6 +228,7 @@ class FileCollector:
         self._recursive   = recursive
         self._observer    = None
         self._use_polling = use_polling
+        self._machine_info =  machine_info
 
         print(f"FileCollector watching: {self._watch_paths}")
 
@@ -234,7 +245,7 @@ class FileCollector:
         return ["/proc", "/sys", "/dev", "/run"]
 
     def start(self):
-        handler  = SentinelFileHandler(self._dispatch, self._ignore_dirs)
+        handler  = SentinelFileHandler(self._dispatch,self._machine_info, self._ignore_dirs)
         ObsClass = PollingObserver if self._use_polling else Observer
         self._observer = ObsClass()
         for path in self._watch_paths:

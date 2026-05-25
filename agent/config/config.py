@@ -11,17 +11,6 @@ JSON_LOGS_BASENAME = "logs-of"
 
 
 
-#################################
-#                               #
-#     DATABASE CONFIGURATIONS   #
-#                               #
-#################################
-
-
-DB_USER = "developer"
-DB_PASSWORD = "password"
-DB_ENDPOINT = "140.245.7.71"
-DB_NAME = "developmentdb"
 
 
 
@@ -35,7 +24,6 @@ DEFAULT_CONFIG = {
     
     "output": {
         "stdout": False,
-
         "kafka": {
             "brokers": "80.225.239.163:9092",
             "topic": "agent-events"
