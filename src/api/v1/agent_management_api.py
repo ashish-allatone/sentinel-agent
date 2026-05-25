@@ -60,14 +60,20 @@ async def getAgents():
 
 
 
-
+# agent_management_router
 
 
 @agent_management_router.get("/get-agent-data" , response_model = standard_success_response[GetAgentDataResponse] , status_code = 200)
-async def getAgents(agent_name:str ):
+async def getAgents(agent_name:str,page:int = 1):
     #  user:dict = Depends(verify_token)
     agent_data = []
     agent_name = agent_name.strip()
+    ROWS_PER_PAGE = 100
+    PAGES_PER_API=10
+    TOTAL = ROWS_PER_PAGE * PAGES_PER_API
+    offset = (page - 1) * TOTAL_ROWS
+    
+    
     async with get_async_db(agent_name) as db:
         print("sdfghjk")
         result = await db.execute(select(MachineLogs).order_by(desc(MachineLogs.id)))
@@ -81,7 +87,17 @@ async def getAgents(agent_name:str ):
         for d in agent_data:
             d.pop('_sa_instance_state', None)
         print("sdfghjk")
+        
+        #split into 10 pages(each page has 100 rows)
+        pages = []
+        for i in range(0, len(agent_data), ROWS_PER_PAGE):
+            pages.append(agent_data[i:i + ROWS_PER_PAGE])
 
-    res_data = GetAgentDataResponse(agent_data = agent_data)
+    res_data =    "api_page": page,
+        "rows_per_page": ROWS_PER_PAGE,
+        "pages_per_api": PAGES_PER_API,
+        "total_rows": total,
+        "total_api_pages": (total + TOTAL_ROWS - 1) // TOTAL_ROWS,
+        "data": pages   # 👈 list of 10 pages
     
     return standard_success_response(data = res_data , message = f"Agent {agent_name} Data Fetched successfully")
