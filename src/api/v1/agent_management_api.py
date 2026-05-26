@@ -1,9 +1,9 @@
 from sqlalchemy.future import select
-from fastapi import APIRouter , Depends , HTTPException , status
+from fastapi import APIRouter , Depends , HTTPException , status , Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from pathlib import Path
 import base64
-from sqlalchemy import desc
+from sqlalchemy import desc ,select, func
 
 ###############################################
 #                                             #
@@ -63,25 +63,66 @@ async def getAgents():
 
 
 
-@agent_management_router.get("/get-agent-data" , response_model = standard_success_response[GetAgentDataResponse] , status_code = 200)
-async def getAgents(agent_name:str ):
-    #  user:dict = Depends(verify_token)
-    agent_data = []
-    agent_name = agent_name.strip()
-    async with get_async_db(agent_name) as db:
-        print("sdfghjk")
-        result = await db.execute(select(MachineLogs).order_by(desc(MachineLogs.id)))
-        db_logs = result.mappings().all()
-        print("sdfghjk")
+# @agent_management_router.get("/get-agent-data" , response_model = standard_success_response[GetAgentDataResponse] , status_code = 200)
+# async def getAgents(agent_name:str ):
+#     #  user:dict = Depends(verify_token)
+#     agent_data = []
+#     agent_name = agent_name.strip()
+#     async with get_async_db(agent_name) as db:
+#         print("sdfghjk")
+#         result = await db.execute(select(MachineLogs).order_by(desc(MachineLogs.id)))
+#         db_logs = result.mappings().all()
+#         print("sdfghjk")
 
-        agent_data = [dict(row)["MachineLogs"].__dict__ for row in db_logs]
-        print("sdfghjk")
+#         agent_data = [dict(row)["MachineLogs"].__dict__ for row in db_logs]
+#         print("sdfghjk")
         
-        # Clean up internal SQLAlchemy state tracking keys if necessary
-        for d in agent_data:
-            d.pop('_sa_instance_state', None)
-        print("sdfghjk")
+#         # Clean up internal SQLAlchemy state tracking keys if necessary
+#         for d in agent_data:
+#             d.pop('_sa_instance_state', None)
+#         print("sdfghjk")
 
-    res_data = GetAgentDataResponse(agent_data = agent_data)
+#     res_data = GetAgentDataResponse(agent_data = agent_data)
     
-    return standard_success_response(data = res_data , message = f"Agent {agent_name} Data Fetched successfully")
+#     return standard_success_response(data = res_data , message = f"Agent {agent_name} Data Fetched successfully")
+
+
+
+@agent_management_router.get("/get-agent-data", response_model=standard_success_response[GetAgentDataResponse], status_code=200)
+async def getAgents(
+    agent_name: str,
+    page: int = Query(default=1, ge=1, description="Page number, starting from 1"),
+):
+    agent_name = agent_name.strip()
+    limit = 100
+    offset = (page - 1) * limit
+
+    async with get_async_db(agent_name) as db:
+        # count_query = select(func.count()).select_from(MachineLogs)
+        # total_records = (await db.execute(count_query)).scalar()
+
+        # 2. Fetch paginated logs using limit and offset
+        query = (
+            select(MachineLogs)
+            .order_by(desc(MachineLogs.id))
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await db.execute(query)
+        db_logs = result.mappings().all()
+
+        # 3. Transform data efficiently
+        agent_data = []
+        for row in db_logs:
+            log_obj = row["MachineLogs"]
+            # Convert to dict and safely remove SQLAlchemy internal state
+            log_dict = {k: v for k, v in log_obj.__dict__.items() if k != '_sa_instance_state'}
+            agent_data.append(log_dict)
+
+    # 4. Construct response
+    res_data = GetAgentDataResponse(agent_data=agent_data)
+    
+    return standard_success_response(
+        data=res_data, 
+        message=f"Agent {agent_name} Data Fetched successfully (Page {page})"
+    )
