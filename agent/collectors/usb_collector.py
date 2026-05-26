@@ -32,6 +32,7 @@ import threading
 import subprocess
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
+from schema.usb_schema import USBInfo,USBEventAction
 
 import psutil
 
@@ -439,12 +440,22 @@ class USBCollector:
         label = snap.get("label") or Path(mp).name or mp
 
         # Build a static FileInfo — safe even after device is removed
-        file_info = FileInfo(
-            path      = mp,
-            name      = label,
-            directory = mp,
+        # file_info = FileInfo(
+        #     path      = mp,
+        #     name      = label,
+        #     directory = mp,
+        # )
+        usb_info = USBInfo(
+            device=snap.get("device"),
+            mountpoint=snap.get("mountpoint"),
+            fstype=snap.get("fstype"),
+            label=snap.get("label"),
+            vendor=snap.get("vendor"),
+            model=snap.get("model"),
+            serial=snap.get("serial"),
+            size_bytes=snap.get("size_bytes"),
+            used_bytes=snap.get("used_bytes"),
         )
-
         auto_notes = (
             f"device={snap.get('device','')}  "
             f"fs={snap.get('fstype','')}  "
@@ -459,13 +470,13 @@ class USBCollector:
             auto_notes += f"  size={size_gb:.1f}GB"
 
         event = SentinelEvent(
-            category  = EventCategory.FILE,
+            category  = EventCategory.SYSTEM,
             action    = action,
             outcome   = outcome,
             severity  = severity,
             collector = "usb_monitor",
             host      = get_host_info(),
-            file      = file_info,
+            file      = usb_info,
             tags      = (tags or []) + ["usb", "removable_media"],
             notes     = notes or auto_notes,
         )

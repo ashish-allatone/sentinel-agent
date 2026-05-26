@@ -25,7 +25,7 @@ from typing import Callable, Dict, Optional, Set, Tuple
 from pathlib import Path
 
 import psutil
-
+from schema.harddisk_schema import HardDiskInfo,HardDiskEventAction
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from schema.event_schema import (
@@ -240,19 +240,29 @@ class HardDiskCollector:
         tags: list    = None,
         notes: str    = None,
     ):
-        file_info = FileInfo(
-            path      = snap.get("mountpoint", snap.get("device", "")),
-            name      = Path(snap.get("mountpoint", snap.get("device", ""))).name or "/",
-            directory = snap.get("mountpoint", snap.get("device", "")),
+        # file_info = FileInfo(
+        #     path      = snap.get("mountpoint", snap.get("device", "")),
+        #     name      = Path(snap.get("mountpoint", snap.get("device", ""))).name or "/",
+        #     directory = snap.get("mountpoint", snap.get("device", "")),
+        # )
+        disk_info = HardDiskInfo(
+            device=snap.get("device"),
+            mountpoint=snap.get("mountpoint"),
+            fstype=snap.get("fstype"),
+            opts=snap.get("opts"),
+            total_bytes=snap.get("total"),
+            used_bytes=snap.get("used"),
+            free_bytes=snap.get("free"),
+            percent=snap.get("percent"),
         )
         event = SentinelEvent(
-            category  = EventCategory.FILE,
+            category  = EventCategory.SYSTEM,
             action    = action,
             outcome   = outcome,
             severity  = severity,
             collector = "harddisk_monitor",
             host      = get_host_info(),
-            file      = file_info,
+            file      = disk_info,
             tags      = (tags or []) + ["disk", "storage"],
             notes     = notes or (
                 f"device={snap.get('device')} mount={snap.get('mountpoint')} "

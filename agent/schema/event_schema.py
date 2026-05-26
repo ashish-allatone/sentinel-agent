@@ -179,6 +179,32 @@ class AuthInfo:
     session_type:   Optional[str]  = None   # ssh | tty | pts | rdp
 
 
+@dataclass
+class HardDiskInfo:
+    device:      Optional[str]   = None
+    mountpoint:  Optional[str]   = None
+    fstype:      Optional[str]   = None
+    opts:        Optional[str]   = None
+    total_bytes: Optional[int]   = None
+    used_bytes:  Optional[int]   = None
+    free_bytes:  Optional[int]   = None
+    percent:     Optional[float] = None
+    smart_alerts: Optional[list] = None   # list of SMART failure strings
+
+
+@dataclass
+class USBInfo:
+    device:      Optional[str] = None   # /dev/sdb or D:\
+    mountpoint:  Optional[str] = None
+    fstype:      Optional[str] = None
+    label:       Optional[str] = None
+    vendor:      Optional[str] = None
+    model:       Optional[str] = None
+    serial:      Optional[str] = None
+    size_bytes:  Optional[int] = None
+    used_bytes:  Optional[int] = None
+    autorun_files: Optional[list] = None  # files found on connect scan
+
 # ─────────────────────────────────────────────
 #  MASTER EVENT
 # ─────────────────────────────────────────────
@@ -213,6 +239,8 @@ class SentinelEvent:
     process:        Optional[ProcessInfo] = None
     network:        Optional[NetworkInfo] = None
     auth:           Optional[AuthInfo]    = None
+    usb:            Optional[USBInfo]      = None     
+    harddisk:       Optional[HardDiskInfo] = None     
 
     # Intelligence fields (filled by analysis layer later)
     risk_score:     Optional[float]= None   # 0.0 - 100.0
