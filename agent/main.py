@@ -2,16 +2,14 @@ from config.config import DEFAULT_CONFIG
 from agent import SentinelAgent
 import signal
 import sys
-import json
 from pathlib import Path
 import argparse
-# from runtime_config import SERVER_IP, AGENT_NAME
+
 def run_tim():
         parser = argparse.ArgumentParser()
 
         parser.add_argument("--server-ip",required=True)
         parser.add_argument("--server-port",type=int,default=8000)
-        # parser.add_argument("--mqtt-host")
         parser.add_argument("--mqtt-port",type=int,default=1883)
         parser.add_argument("--agent-name",required=True)
 
