@@ -72,7 +72,7 @@ jobs:
         run: |
           pyinstaller \
             --onefile \
-            --follow-imports \
+            --name sentinel \
             agent/main.py
 
       - name: Upload Linux Artifact
