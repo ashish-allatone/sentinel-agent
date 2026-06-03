@@ -12,7 +12,6 @@ env:
 jobs:
   build-windows:
     runs-on: windows-latest
-    ene:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
