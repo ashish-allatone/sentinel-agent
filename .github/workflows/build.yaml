@@ -70,7 +70,7 @@ jobs:
 
       - name: Build with pyinstaller
         run: |
-          Pyinstaller \
+          pyinstaller \
             --onefile \
             --follow-imports \
             agent/main.py
