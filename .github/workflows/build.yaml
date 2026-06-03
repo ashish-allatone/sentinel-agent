@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - main
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   pull_request:
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: True
 
 jobs:
   build-windows:
@@ -49,25 +50,17 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-latest
+    container: 
+      image: python:3.11-bullseye
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install Build Tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential
-
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r agent/requirements.txt
           pip install pyinstaller
 
       - name: Build with pyinstaller
