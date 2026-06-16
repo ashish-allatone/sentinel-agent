@@ -34,7 +34,6 @@ def create_refresh_token(data: dict):
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
     token = credentials.credentials  # extracts the token after "Bearer "
-
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
         user_email: str = payload.get("email")

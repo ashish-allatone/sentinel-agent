@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from sqlalchemy import insert
 from contextlib import asynccontextmanager
 from db.base import Base
-from models.user_model import User
+from models.user_model import Users
 from models.agent_model import AgentGroups , Agents
 from models.event_model import AuthEvents , ProcessEvents , NetworkEvents , USBEvents , FileEvents
 import json
@@ -18,8 +18,7 @@ load_dotenv()
 dbuser = os.environ.get("DB_USER")
 dbpassword = os.environ.get("DB_PASSWORD")
 dbendpoint = os.environ.get("DB_ENDPOINT")
-# dbname = os.environ.get("DB_NAME")
-dbname = "testdb"
+dbname = os.environ.get("DB_NAME")
 
 
 DATABASE_URL_ASYNC=f"postgresql+asyncpg://{dbuser}:{dbpassword}@{dbendpoint}:5432/{dbname}"
