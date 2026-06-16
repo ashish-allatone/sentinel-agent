@@ -1,0 +1,43 @@
+# docker-compose.yml
+# Postgres and Mosquitto in Docker. Same file works on Linux and Windows.
+#
+# Port mappings bind to 0.0.0.0 on the host, so any machine that can reach
+# this host (and gets through its firewall) can connect to:
+#   localhost:5433  -> Postgres
+#   localhost:1884  -> Mosquitto MQTT
+
+services:
+
+  sentinel-postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: sentinel-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     developer
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB:       developmentdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U developer -d developmentdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  sentinel-mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: sentinel-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1884:1883"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+
+volumes:
+  postgres-data:
+  mosquitto-data:
+  mosquitto-log:
