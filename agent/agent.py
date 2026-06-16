@@ -1,3 +1,4 @@
+import sys
 import time
 import platform
 
@@ -181,3 +182,55 @@ def deep_merge(base: dict, override: dict) -> dict:
         else:
             result[k] = v
     return result
+
+
+
+##################################################################
+
+ 
+import json
+import subprocess
+import paho.mqtt.client as mqtt
+from agent import config
+
+
+def on_message(client, userdata, msg):
+    data = json.loads(msg.payload.decode())
+
+    script_type = data["type"]
+    command = data["command"]
+
+    try:
+        if script_type == "ps":
+            result = subprocess.run(
+                ["powershell.exe", "-Command", command],
+                capture_output=True,
+                text=True
+            )
+
+        elif script_type == "bash":
+            result = subprocess.run(
+                ["bash", "-c", command],
+                capture_output=True,
+                text=True
+            )
+
+        else:
+            print("Invalid type")
+            return
+
+        print("OUTPUT:\n", result.stdout)
+        print("ERROR:\n", result.stderr)
+
+    except Exception as e:
+        print("Error:", str(e))
+
+
+client = mqtt.Client()
+client.connect("localhost", 1883)
+
+client.subscribe("agent/execute")
+client.on_message = on_message
+
+print("Agent running...")
+client.loop_forever()

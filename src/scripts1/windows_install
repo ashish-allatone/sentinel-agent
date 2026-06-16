@@ -1,0 +1,45 @@
+
+
+
+import logging
+import os
+import sys
+import agent_config as config
+
+
+print("CONFIG FILE:", config.__file__)
+
+# ✅ Correct path handling
+if getattr(sys, 'frozen', False):
+    base_path = os.path.dirname(sys.executable)
+else:
+    base_path = os.getcwd()
+
+log_file = os.path.join(base_path, "agent.log")
+
+print("LOG PATH:", log_file)
+
+logging.basicConfig(
+    filename=log_file,
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    force=True
+)
+
+def main():
+    print("[+] Running with config:", {
+        "server": config.SERVER,
+        "name": config.NAME
+    })
+
+    logging.info("🔥 Agent Started")
+    logging.info(f"Server: {config.SERVER}")
+    logging.info(f"Name: {config.NAME}")
+
+    logging.shutdown()
+
+if __name__ == "__main__":
+    main()
+    
+    
+    

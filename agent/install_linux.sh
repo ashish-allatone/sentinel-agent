@@ -321,3 +321,51 @@ echo "journalctl -u $SERVICE_NAME -f"
 
 echo ""
 echo "====================================="
+
+
+
+######################################################################
+
+
+#!/bin/bash
+
+echo "[+] Installing Agent..."
+
+SERVER_IP=$1
+NAME=$2
+
+if [ -z "$SERVER_IP" ]; then
+  echo "Usage: install.sh <server_ip> <name>"
+  exit 1
+fi
+
+INSTALL_DIR="/opt/sentinel-agent"
+mkdir -p $INSTALL_DIR
+
+echo "[+] Downloading agent from builder..."
+
+curl -o $INSTALL_DIR/agent \
+"http://your-server:5000/build?ip=$SERVER_IP&name=$NAME"
+
+chmod +x $INSTALL_DIR/agent
+
+# 🔥 Create systemd service
+cat <<EOF > /etc/systemd/system/sentinel-agent.service
+[Unit]
+Description=Sentinel Agent
+After=network.target
+
+[Service]
+ExecStart=$INSTALL_DIR/agent
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable sentinel-agent
+systemctl start sentinel-agent
+
+echo "✅ Agent Installed & Running"
