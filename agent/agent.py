@@ -58,80 +58,80 @@ class SentinelAgent:
     def start(self):
         self._dispatcher = self._build_dispatcher()
         dispatch = self._make_dispatch()
-        # try:
+        try:
             
-        #     fc = FileCollector(
-        #         dispatch    = dispatch,
-        #         machine_info= self.machine_info,
-        #         watch_paths = None,
-        #         ignore_dirs = None,
-        #         recursive   = True,
-        #         use_polling = False,
-        #     )
-        #     fc.start()
-        #     self._collectors.append(fc)
-        #     print("✓ File Collector started")
-        # except ImportError as e:
-        #     print(f"File collector unavailable: {e}")
-        # except Exception as e:
-        #     print(f"File collector error: {e}")
+            fc = FileCollector(
+                dispatch    = dispatch,
+                machine_info= self.machine_info,
+                watch_paths = None,
+                ignore_dirs = None,
+                recursive   = True,
+                use_polling = False,
+            )
+            fc.start()
+            self._collectors.append(fc)
+            print("✓ File Collector started")
+        except ImportError as e:
+            print(f"File collector unavailable: {e}")
+        except Exception as e:
+            print(f"File collector error: {e}")
 
 
-        # try:
+        try:
             
-        #     ac = create_auth_collector(
-        #         dispatch       = dispatch,
-        #         machine_info = self.machine_info
-        #     )
-        #     ac.start()
-        #     self._collectors.append(ac)
-        #     print("Auth Collector started")
-        # except Exception as e:
-        #     print(f"Auth collector error: {e}")
+            ac = create_auth_collector(
+                dispatch       = dispatch,
+                machine_info = self.machine_info
+            )
+            ac.start()
+            self._collectors.append(ac)
+            print("Auth Collector started")
+        except Exception as e:
+            print(f"Auth collector error: {e}")
 
-        # try:
+        try:
             
-        #     nc = NetworkCollector(
-        #         dispatch        = dispatch,
-        #         machine_info= self.machine_info,
-        #         poll_interval   = 2.0,
-        #         track_bandwidth = True
-        #     )
-        #     nc.start()
-        #     self._collectors.append(nc)
-        #     print(" Network Collector started")
-        # except Exception as e:
-        #     print(f"Network collector error: {e}")
+            nc = NetworkCollector(
+                dispatch        = dispatch,
+                machine_info= self.machine_info,
+                poll_interval   = 2.0,
+                track_bandwidth = True
+            )
+            nc.start()
+            self._collectors.append(nc)
+            print(" Network Collector started")
+        except Exception as e:
+            print(f"Network collector error: {e}")
 
-        # try:
+        try:
             
-        #     pc = ProcessCollector(
-        #         dispatch          = dispatch,
-        #         machine_info= self.machine_info,
-        #         poll_interval     = 1.5,
-        #         resource_interval = 30.0,
-        #         hash_executables  = True
-        #     )
-        #     pc.start()
-        #     self._collectors.append(pc)
-        #     print("Process Collector started")
-        # except Exception as e:
-        #     print(f"Process collector error: {e}")
+            pc = ProcessCollector(
+                dispatch          = dispatch,
+                machine_info= self.machine_info,
+                poll_interval     = 1.5,
+                resource_interval = 30.0,
+                hash_executables  = True
+            )
+            pc.start()
+            self._collectors.append(pc)
+            print("Process Collector started")
+        except Exception as e:
+            print(f"Process collector error: {e}")
 
 
-        # try:
-        #     uc = USBCollector(
-        #         dispatch                 = dispatch,
-        #         machine_info= self.machine_info,
-        #         poll_interval            = 3.0,
-        #         scan_on_connect          = True,
-        #         transfer_threshold_bytes = 524288000,
-        #     )
-        #     uc.start()
-        #     self._collectors.append(uc)
-        #     print("USB Collector started")
-        # except Exception as e:
-        #     print(f"USB collector error: {e}")
+        try:
+            uc = USBCollector(
+                dispatch                 = dispatch,
+                machine_info= self.machine_info,
+                poll_interval            = 3.0,
+                scan_on_connect          = True,
+                transfer_threshold_bytes = 524288000,
+            )
+            uc.start()
+            self._collectors.append(uc)
+            print("USB Collector started")
+        except Exception as e:
+            print(f"USB collector error: {e}")
 
         #Database discovery collector (detects local engines: postgres/mysql/oracle...)
         dd_cfg = self.config.get("collectors", {}).get("db_discovery", {})
