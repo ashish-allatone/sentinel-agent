@@ -2,9 +2,13 @@
      "poll_interval": 100,
      "allow_auto_auth": false,             
      "enabled_engines": [],         
-     "engines": {                          
-       "mysql": { "user": "monitor", "password_env": "MYSQL_PW", "port": 3306 }
-     },
+    "engines": {
+    "postgresql": {"host": "127.0.0.1", "port": 5432, "user": "postgres", "password_env": "PG_LOCAL_PASSWORD", "dbname": "postgres"},
+    "mysql":      {"host": "127.0.0.1", "port": 3306, "user": "root", "password_env": "MYSQL_LOCAL_PASSWORD"},
+    "oracle":     {"host": "127.0.0.1", "port": 1521, "user": "system", "password_env": "ORACLE_LOCAL_PASSWORD", "service_name": "XEPDB1"},
+    "redis":      {"host": "127.0.0.1", "port": 6379 , "password_env": "REDIS_LOCAL_PASSWORD", "decode_responses": "True" },
+    "mongodb":    {"host": "127.0.0.1", "port": 27017}
+      },
      "targets": [
     {"name": "prod-pg-server", "engine": "postgresql", "host": "141.148.220.11", "port": 5432, "user": "developer", "password_env": "password", "dbname": "developmentdb"},
     {"name": "prod-pg-server2", "engine": "postgresql", "host": "141.148.220.11", "port": 5433, "user": "developer", "password_env": "password", "dbname": "developmentdb"},
