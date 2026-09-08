@@ -25,6 +25,9 @@ export const ADD_CHANNEL_PATH = "/add-communication-channels";
 // "communicaiton" is the spelling the server route actually uses.
 export const DELETE_CHANNEL_PATH = "/delete-communicaiton-channel";
 
+export const COMMUNICATION_TEST_CONFIG_PATH = "/communication/test-config";
+export const COMMUNICATION_SEND_PATH = "/communication/send";
+
 /** Error carrying what the UI needs to explain a failure. */
 function channelsError(message, { status, url, cause } = {}) {
   const err = new Error(message);
@@ -130,6 +133,35 @@ export async function deleteChannel(id) {
       params: { communication_channel_id: id },
     });
     return id;
+  } catch (err) {
+    throw toApiError(err, url);
+  }
+}
+
+
+// NEW FUNCTIONS BELOW
+
+export async function fetchChannelReadiness(options = {}) {
+  const url = absoluteApiUrl(COMMUNICATION_TEST_CONFIG_PATH);
+
+  try {
+    const res = await api.get(COMMUNICATION_TEST_CONFIG_PATH, {
+      signal: options.signal,
+    });
+
+    return (res.data && res.data.data && res.data.data.channels) || [];
+  } catch (err) {
+    throw toApiError(err, url);
+  }
+}
+
+export async function sendCommunication(payload) {
+  const url = absoluteApiUrl(COMMUNICATION_SEND_PATH);
+
+  try {
+    const res = await api.post(COMMUNICATION_SEND_PATH, payload);
+
+    return (res.data && res.data.data) || {};
   } catch (err) {
     throw toApiError(err, url);
   }

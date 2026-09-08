@@ -1,14 +1,4 @@
-/* .layout {
-  /* display: flex;
-  flex-direction: column; */
-  /* min-height: 100vh; */
-/* } */
 
-/* .layout-content { */
-  /* flex: 1;
-  display: flex; */
-  /* width: 100%; */
-/* } */
 
 .layout {
   min-height: 100vh;
@@ -98,5 +88,4 @@
   .layout-main {
     padding-top: 56px;
   }
-
 }

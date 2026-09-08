@@ -673,199 +673,7 @@
   }
 }
 
-/* ── print / PDF ─────────────────────────────────────────────
-   One chart per page. Export forces the light theme first, so the charts are
-   already drawn in the light steps by the time this applies. */
-/* @media print { */
-  /* AgentDetails.css ships an unscoped `body { background: var(--bg-primary) }`
-     with --bg-primary #111217, which CRA bundles globally. A body background
-     propagates to the page canvas, so it paints EVERY sheet dark — visible
-     wherever this report's own white box does not reach (i.e. the tail of the
-     last page). Neutralise the canvas for the duration of the print. */
-  /* html,
-  body {
-    background: #fff;
-  } */
 
-  /* hide the live app without unmounting it — visibility keeps layout cheap */
-  /* body * {
-    visibility: hidden;
-  }
-  .capacity-dash__print,
-  .capacity-dash__print * {
-    visibility: visible;
-  }
-
-  .capacity-dash {
-    background: #fff;
-    padding: 0;
-    display: block;
-    min-height: 0;
-  }
-  .capacity-dash__print {
-    display: block;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    background: #fff;
-    color: #0f141c;
-  }
-
-  /* the actual "different chart on a different page" rule */
-  /* .capacity-dash__print-page {
-    break-after: page;
-    page-break-after: always;
-    break-inside: avoid;
-    page-break-inside: avoid;
-    padding-top: 2mm;
-  } */
-  /* the cover carries prose rather than a fixed-size chart, so it is allowed to
-     run on if the summary table wraps */
-  /* .capacity-dash__print-cover {
-    break-inside: auto;
-    page-break-inside: auto;
-  }
-  .capacity-dash__print-page:last-child {
-    break-after: auto;
-    page-break-after: auto;
-  } */
-
-  /* A printed report is read at arm's length and often photocopied, so the type
-     is set well above the screen's. Each chart already owns a page, so the extra
-     size costs nothing but white space. */
-  /* .capacity-dash__print {
-    font-size: 15px;
-    line-height: 1.5;
-  } */
-
-  /* .capacity-dash__print-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    border-bottom: 1px solid #cfd4de;
-    padding-bottom: 6px;
-    margin-bottom: 14px;
-    font-size: 13px;
-    color: #6b7280;
-  }
-  .capacity-dash__print-brand {
-    font-weight: 700;
-    color: #0f141c;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-  .capacity-dash__print-h1 {
-    font-size: 26px;
-    font-weight: 700;
-    margin: 0 0 14px;
-    color: #0f141c;
-  }
-  .capacity-dash__print-h2 {
-    font-size: 21px;
-    margin: 0 0 10px;
-    color: #0f141c;
-  }
-  .capacity-dash__print-h2 span {
-    color: #6b7280;
-    font-weight: 400;
-  } */
-
-  /* the plain-English note that opens the cover and every chart page */
-  /* .capacity-dash__print-lead {
-    font-size: 15.5px;
-    line-height: 1.65;
-    color: #313947;
-    margin: 0 0 16px;
-    max-width: 62em; */
-    /* a heading must not be left stranded from the text it introduces */
-    /* break-before: avoid;
-    page-break-before: avoid;
-  } */
-
-  /* .capacity-dash__print-table {
-    border-collapse: collapse;
-    width: 100%;
-    margin-bottom: 14px;
-    font-size: 14px;
-  }
-  .capacity-dash__print-table th {
-    text-align: left;
-    color: #6b7280;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-size: 12.5px;
-    border-bottom: 1px solid #dfe3ea;
-    padding: 6px 10px 6px 0;
-  }
-  .capacity-dash__print-table td {
-    padding: 8px 10px 8px 0;
-    font-variant-numeric: tabular-nums;
-    color: #0f141c;
-  }
-
-  /* cover contents list */
-  /* .capacity-dash__print-toc {
-    margin-top: 4px;
-  }
-  .capacity-dash__print-toc-head {
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #6b7280;
-    margin-bottom: 6px;
-  }
-  .capacity-dash__print-toc-list {
-    margin: 0;
-    padding-left: 20px;
-    font-size: 16px;
-    line-height: 2;
-    color: #0f141c;
-  }
-  .capacity-dash__print-toc-list span {
-    color: #6b7280;
-  }
-
-  .capacity-dash__print-note {
-    font-size: 14px;
-    line-height: 1.55;
-    color: #6b7280;
-    margin: 10px 0 0;
-    max-width: 62em;
-  }
-  .capacity-dash__print-foot {
-    margin-top: 10px;
-    font-size: 12px;
-    color: #98a0ad;
-    text-align: right;
-  } */ 
-  /* the pane header is reused for the legend; drop its interactive affordances */
-  /* .capacity-dash__print .capacity-dash__pane-title {
-    color: #0f141c;
-    font-size: 16px;
-  }
-  .capacity-dash__print .capacity-dash__legend-item {
-    color: #313947;
-    font-size: 14px;
-    padding: 3px 0;
-    margin-right: 14px;
-  }
-  .capacity-dash__print .capacity-dash__pane-unit {
-    display: none;
-  } */
-
-  /* keep the series colours — a chart printed in greyscale states nothing */
-  /* .capacity-dash__print * {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  @page {
-    size: A4 portrait;
-    margin: 12mm;
-  } */
-/* } */
 
 .capacity-dash__print {
   display: none;
@@ -1734,4 +1542,695 @@
 
   color: #176b4d;
 }
+}
+
+/* ============================================================
+   COMMUNICATION CHANNELS — SEND CAPACITY PDF
+   ============================================================ */
+
+/* Primary action button used for Send PDF / Send Report */
+
+.capacity-dash__btn--primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.capacity-dash__btn--primary:hover:not(:disabled) {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.capacity-dash__btn--primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+/* ============================================================
+   SEND MODAL OVERLAY
+   ============================================================ */
+
+.capacity-dash__send-overlay {
+  position: fixed;
+  inset: 0;
+
+  z-index: 9999;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+
+  background: rgba(15, 23, 42, 0.65);
+
+  overflow-y: auto;
+}
+
+
+/* ============================================================
+   SEND MODAL
+   ============================================================ */
+
+.capacity-dash__send-modal {
+  width: min(720px, 100%);
+
+  max-height: min(760px, calc(100vh - 48px));
+
+  display: flex;
+  flex-direction: column;
+
+  background: #ffffff;
+
+  border-radius: 16px;
+
+  border: 1px solid rgba(148, 163, 184, 0.35);
+
+  box-shadow:
+    0 24px 60px rgba(15, 23, 42, 0.25);
+
+  overflow: hidden;
+}
+
+
+/* ============================================================
+   MODAL HEADER
+   ============================================================ */
+
+.capacity-dash__send-header {
+  display: flex;
+
+  align-items: flex-start;
+
+  justify-content: space-between;
+
+  gap: 20px;
+
+  padding: 24px 28px;
+
+  border-bottom: 1px solid #e2e8f0;
+
+  background: #ffffff;
+}
+
+
+.capacity-dash__send-eyebrow {
+  margin: 0 0 6px;
+
+  font-size: 11px;
+
+  font-weight: 700;
+
+  letter-spacing: 0.12em;
+
+  color: #64748b;
+}
+
+
+.capacity-dash__send-title {
+  margin: 0;
+
+  font-size: 22px;
+
+  line-height: 1.25;
+
+  font-weight: 700;
+
+  color: #0f172a;
+}
+
+
+.capacity-dash__send-subtitle {
+  margin: 8px 0 0;
+
+  max-width: 540px;
+
+  font-size: 14px;
+
+  line-height: 1.55;
+
+  color: #64748b;
+}
+
+
+/* Close button */
+
+.capacity-dash__send-close {
+  flex: 0 0 auto;
+
+  width: 36px;
+
+  height: 36px;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #e2e8f0;
+
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #475569;
+
+  font-size: 26px;
+
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+
+.capacity-dash__send-close:hover:not(:disabled) {
+  background: #f8fafc;
+
+  color: #0f172a;
+}
+
+
+.capacity-dash__send-close:disabled {
+  opacity: 0.5;
+
+  cursor: not-allowed;
+}
+
+
+/* ============================================================
+   MODAL BODY
+   ============================================================ */
+
+.capacity-dash__send-body {
+  flex: 1;
+
+  min-height: 0;
+
+  padding: 22px 28px;
+
+  overflow-y: auto;
+
+  background: #f8fafc;
+}
+
+
+/* ============================================================
+   ERROR / SUCCESS STATES
+   ============================================================ */
+
+.capacity-dash__send-error {
+  margin-bottom: 16px;
+
+  padding: 12px 14px;
+
+  border: 1px solid #fecaca;
+
+  border-radius: 10px;
+
+  background: #fef2f2;
+
+  color: #b91c1c;
+
+  font-size: 14px;
+
+  line-height: 1.5;
+}
+
+
+.capacity-dash__send-success {
+  margin-bottom: 16px;
+
+  padding: 12px 14px;
+
+  border: 1px solid #bbf7d0;
+
+  border-radius: 10px;
+
+  background: #f0fdf4;
+
+  color: #15803d;
+
+  font-size: 14px;
+
+  line-height: 1.5;
+}
+
+
+/* ============================================================
+   LOADING / EMPTY STATE
+   ============================================================ */
+
+.capacity-dash__send-loading,
+.capacity-dash__send-empty {
+  padding: 32px 20px;
+
+  text-align: center;
+
+  border: 1px dashed #cbd5e1;
+
+  border-radius: 12px;
+
+  background: #ffffff;
+
+  color: #64748b;
+
+  font-size: 14px;
+}
+
+
+/* ============================================================
+   CHANNEL LIST
+   ============================================================ */
+
+.capacity-dash__channel-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 10px;
+}
+
+
+/* Individual channel */
+
+.capacity-dash__channel {
+  display: flex;
+
+  align-items: flex-start;
+
+  gap: 14px;
+
+  padding: 16px;
+
+  border: 1px solid #e2e8f0;
+
+  border-radius: 12px;
+
+  background: #ffffff;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+
+.capacity-dash__channel:hover {
+  border-color: #94a3b8;
+
+  box-shadow:
+    0 3px 10px rgba(15, 23, 42, 0.06);
+}
+
+
+/* Selected channel */
+
+.capacity-dash__channel--selected {
+  border-color: #2563eb;
+
+  background: #eff6ff;
+
+  box-shadow:
+    0 0 0 1px rgba(37, 99, 235, 0.15);
+}
+
+
+/* Channel whose backend sender isn't configured */
+
+.capacity-dash__channel--not-ready {
+  opacity: 0.82;
+}
+
+
+/* Checkbox */
+
+.capacity-dash__channel input[type="checkbox"] {
+  width: 18px;
+
+  height: 18px;
+
+  margin: 3px 0 0;
+
+  flex: 0 0 auto;
+
+  cursor: pointer;
+
+  accent-color: #2563eb;
+}
+
+
+/* ============================================================
+   CHANNEL CONTENT
+   ============================================================ */
+
+.capacity-dash__channel-main {
+  min-width: 0;
+
+  flex: 1;
+}
+
+
+.capacity-dash__channel-name {
+  overflow: hidden;
+
+  color: #0f172a;
+
+  font-size: 15px;
+
+  font-weight: 700;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+
+.capacity-dash__channel-value {
+  margin-top: 4px;
+
+  overflow: hidden;
+
+  color: #64748b;
+
+  font-size: 13px;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+
+/* ============================================================
+   CHANNEL BADGES
+   ============================================================ */
+
+.capacity-dash__channel-meta {
+  display: flex;
+
+  align-items: center;
+
+  flex-wrap: wrap;
+
+  gap: 6px;
+
+  margin-top: 10px;
+}
+
+
+.capacity-dash__channel-type,
+.capacity-dash__channel-ready,
+.capacity-dash__channel-not-ready,
+.capacity-dash__channel-pdf,
+.capacity-dash__channel-message-only {
+  display: inline-flex;
+
+  align-items: center;
+
+  min-height: 23px;
+
+  padding: 3px 8px;
+
+  border-radius: 999px;
+
+  font-size: 11px;
+
+  font-weight: 600;
+
+  line-height: 1.3;
+}
+
+
+/* Channel type */
+
+.capacity-dash__channel-type {
+  background: #e2e8f0;
+
+  color: #475569;
+}
+
+
+/* Backend ready */
+
+.capacity-dash__channel-ready {
+  background: #dcfce7;
+
+  color: #15803d;
+}
+
+
+/* Backend sender not configured */
+
+.capacity-dash__channel-not-ready {
+  background: #fef3c7;
+
+  color: #92400e;
+}
+
+
+/* Backend can attach PDF */
+
+.capacity-dash__channel-pdf {
+  background: #dbeafe;
+
+  color: #1d4ed8;
+}
+
+
+/* Backend sends only text */
+
+.capacity-dash__channel-message-only {
+  background: #f1f5f9;
+
+  color: #64748b;
+}
+
+
+/* Backend readiness explanation */
+
+.capacity-dash__channel-note {
+  margin-top: 8px;
+
+  color: #b45309;
+
+  font-size: 12px;
+
+  line-height: 1.45;
+}
+
+
+/* ============================================================
+   MODAL FOOTER
+   ============================================================ */
+
+.capacity-dash__send-footer {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 16px;
+
+  padding: 18px 28px;
+
+  border-top: 1px solid #e2e8f0;
+
+  background: #ffffff;
+}
+
+
+.capacity-dash__send-selection {
+  color: #64748b;
+
+  font-size: 13px;
+
+  font-weight: 600;
+}
+
+
+.capacity-dash__send-actions {
+  display: flex;
+
+  align-items: center;
+
+  gap: 10px;
+}
+
+
+/* ============================================================
+   HIDDEN REPORT USED BY html2canvas
+   ============================================================ */
+
+/*
+  IMPORTANT:
+
+  PrintReport normally uses .capacity-dash__print.
+
+  If that class is display:none outside print mode, html2canvas cannot
+  capture it.
+
+  This wrapper keeps the report rendered and visible to html2canvas,
+  but moves it far outside the browser viewport so the user never sees it.
+*/
+
+.capacity-dash__send-report-capture {
+  position: fixed;
+
+  top: 0;
+
+  left: -20000px;
+
+  width: 210mm;
+
+  display: block;
+
+  visibility: visible;
+
+  pointer-events: none;
+
+  z-index: -1;
+
+  background: #ffffff;
+}
+
+
+/*
+  Override any normal-screen hiding rule for the PrintReport only when it
+  is inside the hidden PDF capture wrapper.
+*/
+
+.capacity-dash__send-report-capture .capacity-dash__print {
+  display: block !important;
+
+  width: 210mm;
+
+  margin: 0;
+
+  padding: 0;
+
+  background: #ffffff;
+
+  visibility: visible !important;
+}
+
+
+/*
+  Each existing report page remains individually available for html2canvas.
+*/
+
+/* .capacity-dash__send-report-capture .capacity-dash__print-page {
+  display: block;
+
+  width: 210mm;
+
+  min-height: 297mm;
+
+  box-sizing: border-box;
+
+  margin: 0;
+
+  overflow: hidden;
+
+  background: #ffffff;
+} */
+
+.capacity-dash__send-report-capture .capacity-dash__print-page {
+  display: block;
+  margin: 0;
+  background: #ffffff;
+}
+
+
+/* ============================================================
+   RESPONSIVE — SEND MODAL
+   ============================================================ */
+
+@media (max-width: 700px) {
+
+  .capacity-dash__send-overlay {
+    align-items: flex-end;
+
+    padding: 0;
+  }
+
+
+  .capacity-dash__send-modal {
+    width: 100%;
+
+    max-height: 90vh;
+
+    border-radius: 18px 18px 0 0;
+  }
+
+
+  .capacity-dash__send-header {
+    padding: 20px;
+  }
+
+
+  .capacity-dash__send-body {
+    padding: 18px;
+  }
+
+
+  .capacity-dash__send-footer {
+    padding: 16px 20px;
+  }
+
+
+  .capacity-dash__send-footer {
+    align-items: flex-start;
+
+    flex-direction: column;
+  }
+
+
+  .capacity-dash__send-actions {
+    width: 100%;
+
+    justify-content: flex-end;
+  }
+
+
+  .capacity-dash__channel {
+    padding: 14px;
+  }
+
+
+  .capacity-dash__channel-name,
+  .capacity-dash__channel-value {
+    white-space: normal;
+
+    overflow: visible;
+
+    text-overflow: clip;
+
+    word-break: break-word;
+  }
+
+}
+
+
+/* ============================================================
+   PRINT SAFETY
+   ============================================================ */
+
+/*
+  Communication modal and hidden capture wrapper must never appear in the
+  existing browser print dialog used by Export PDF.
+*/
+
+@media print {
+
+  .capacity-dash__send-overlay,
+  .capacity-dash__send-report-capture {
+    display: none !important;
+  }
+
 }

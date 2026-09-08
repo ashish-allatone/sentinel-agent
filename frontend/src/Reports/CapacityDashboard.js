@@ -27,6 +27,15 @@ import { CHART_CHROME, GAP_COLOR, SERIES_COLORS } from "./colors";
 import { istInputToApi, lastHoursInputs } from "./timeRange";
 import "./CapacityDashboard.css";
 
+import {
+  fetchChannels,
+  fetchChannelReadiness,
+  sendCommunication,
+} from "../Channels/channelsApi";
+
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
+
 // ── zoom/pan constants ─────────────────────────────────────────
 const MIN_SPAN = 8; // never zoom tighter than 8 samples
 const ZOOM_IN = 0.8;
@@ -1353,9 +1362,27 @@ export default function CapacityDashboard() {
   const [theme, setTheme] = useState(initialTheme);
   const [printing, setPrinting] = useState(false);
 
+  // ── communication / send PDF ───────────────────────────────────
+
+const [sendModalOpen, setSendModalOpen] = useState(false);
+
+const [channels, setChannels] = useState([]);
+const [channelReadiness, setChannelReadiness] = useState([]);
+
+const [channelsLoading, setChannelsLoading] = useState(false);
+const [selectedChannelIds, setSelectedChannelIds] = useState([]);
+
+const [sendingPdf, setSendingPdf] = useState(false);
+const [sendError, setSendError] = useState("");
+const [sendSuccess, setSendSuccess] = useState("");
+
+const [sendReportReady, setSendReportReady] = useState(false);
+
   const abortRef = useRef(null);
   const requestRef = useRef(0);
   const themeBeforePrint = useRef(theme);
+
+  const sendReportRef = useRef(null);
 
   const rows = useMemo(() => buildRows(payload), [payload]);
   const gaps = useMemo(() => findGaps(rows), [rows]);
@@ -1472,6 +1499,482 @@ export default function CapacityDashboard() {
     setTheme("light");
     setPrinting(true);
   };
+
+
+  /**
+ * Open the communication-channel selector and load the latest
+ * channel list + backend readiness information.
+ */
+const openSendModal = async () => {
+  if (!rows.length || sendingPdf) return;
+
+  setSendModalOpen(true);
+  setSendError("");
+  setSendSuccess("");
+  setChannelsLoading(true);
+
+  try {
+    const [channelList, readinessList] = await Promise.all([
+      fetchChannels(),
+      fetchChannelReadiness(),
+    ]);
+
+    setChannels(channelList || []);
+    setChannelReadiness(readinessList || []);
+
+    // Do not automatically select channels. The user explicitly chooses
+    // where the report should go.
+    setSelectedChannelIds([]);
+  } catch (err) {
+    setSendError(err?.message || "Unable to load communication channels.");
+  } finally {
+    setChannelsLoading(false);
+  }
+};
+
+
+/**
+ * Close the send modal.
+ *
+ * A PDF send cannot be cancelled halfway through because the backend may
+ * already be delivering to some channels.
+ */
+const closeSendModal = () => {
+  if (sendingPdf) return;
+
+  setSendModalOpen(false);
+  setSendError("");
+  setSendSuccess("");
+};
+
+
+/**
+ * Select or unselect one specific communication-channel row.
+ */
+const toggleChannelSelection = (channelId) => {
+  setSelectedChannelIds((current) =>
+    current.includes(channelId)
+      ? current.filter((id) => id !== channelId)
+      : [...current, channelId]
+  );
+};
+
+
+/**
+ * Find the backend readiness record belonging to one channel.
+ */
+const readinessForChannel = (channelId) =>
+  channelReadiness.find((item) => item.id === channelId);
+
+
+/**
+ * Convert a Blob into the raw base64 string expected by the backend.
+ *
+ * The backend calls Python's base64.b64decode(), so we remove the
+ * "data:application/pdf;base64," prefix produced by FileReader.
+ */
+const blobToBase64 = (blob) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      const commaIndex = result.indexOf(",");
+
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Unable to prepare the PDF for sending."));
+    };
+
+    reader.readAsDataURL(blob);
+  });
+
+
+/**
+ * Wait for the hidden PrintReport to render its charts before capturing it.
+ */
+const waitForReportRender = () =>
+  new Promise((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        // Recharts can finish SVG layout one tick after React commits.
+        window.setTimeout(resolve, 250);
+      });
+    });
+  });
+
+
+/**
+ * Capture the existing PrintReport and build a multi-page A4 PDF.
+ *
+ * IMPORTANT:
+ * - Existing Export PDF / window.print() is NOT used here.
+ * - The same PrintReport component is reused.
+ * - Each `.capacity-dash__print-page` becomes one PDF page.
+ */
+const buildCapacityPdfBlob = async () => {
+  setSendReportReady(true);
+
+  await waitForReportRender();
+
+  const reportElement = sendReportRef.current;
+
+  if (!reportElement) {
+    throw new Error("The report could not be prepared for sending.");
+  }
+
+  const pages = Array.from(
+    reportElement.querySelectorAll(".capacity-dash__print-page")
+  );
+
+  if (!pages.length) {
+    throw new Error("No report pages were available to create the PDF.");
+  }
+
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+    compress: true,
+  });
+
+//   for (let index = 0; index < pages.length; index += 1) {
+//     const page = pages[index];
+
+//     // const canvas = await html2canvas(page, {
+//     //   scale: 2,
+//     //   useCORS: true,
+//     //   backgroundColor: "#ffffff",
+//     //   logging: false,
+//     //   windowWidth: page.scrollWidth,
+//     //   windowHeight: page.scrollHeight,
+//     // });
+
+//     const canvas = await html2canvas(page, {
+//   scale: 2,
+//   useCORS: true,
+//   backgroundColor: "#ffffff",
+//   logging: false,
+
+//   windowWidth: 794,
+//   windowHeight: 1123,
+
+//   onclone: (clonedDocument) => {
+//     let printCss = "";
+
+//     Array.from(document.styleSheets).forEach((styleSheet) => {
+//       try {
+//         Array.from(styleSheet.cssRules).forEach((rule) => {
+//           if (
+//             rule instanceof CSSMediaRule &&
+//             rule.media &&
+//             rule.media.mediaText.includes("print")
+//           ) {
+//             Array.from(rule.cssRules).forEach((printRule) => {
+//               printCss += `${printRule.cssText}\n`;
+//             });
+//           }
+//         });
+//       } catch (error) {
+//         // Ignore inaccessible stylesheets
+//       }
+//     });
+
+//     const style = clonedDocument.createElement("style");
+
+//     style.setAttribute(
+//       "data-capacity-send-pdf-print-styles",
+//       "true"
+//     );
+
+//     style.textContent = printCss;
+
+//     clonedDocument.head.appendChild(style);
+
+//     const printReport = clonedDocument.querySelector(
+//       ".capacity-dash__send-report-capture .capacity-dash__print"
+//     );
+
+//     if (printReport) {
+//       printReport.style.display = "block";
+//       printReport.style.visibility = "visible";
+//       printReport.style.position = "relative";
+//     }
+//   },
+// });
+
+//     const imageData = canvas.toDataURL("image/jpeg", 0.92);
+
+//     const pdfWidth = 210;
+//     const pdfHeight = 297;
+
+//     const imageWidth = pdfWidth;
+//     const imageHeight = (canvas.height * imageWidth) / canvas.width;
+
+//     // Every PrintReport page is designed as a page. Scale it down to fit
+//     // within A4 while keeping its aspect ratio.
+//     const renderHeight = Math.min(imageHeight, pdfHeight);
+//     const renderWidth = (canvas.width * renderHeight) / canvas.height;
+
+//     const x = (pdfWidth - renderWidth) / 2;
+//     const y = (pdfHeight - renderHeight) / 2;
+
+//     if (index > 0) {
+//       pdf.addPage();
+//     }
+
+//     pdf.addImage(
+//       imageData,
+//       "JPEG",
+//       x,
+//       y,
+//       renderWidth,
+//       renderHeight,
+//       undefined,
+//       "FAST"
+//     );
+//   }
+
+for (let index = 0; index < pages.length; index += 1) {
+  const page = pages[index];
+
+  const canvas = await html2canvas(page, {
+  scale: 2,
+  useCORS: true,
+  backgroundColor: "#ffffff",
+  logging: false,
+
+  windowWidth: page.scrollWidth || page.offsetWidth,
+  windowHeight: page.scrollHeight || page.offsetHeight,
+
+  onclone: (clonedDocument) => {
+    let printCss = "";
+
+    Array.from(document.styleSheets).forEach((styleSheet) => {
+      try {
+        Array.from(styleSheet.cssRules).forEach((rule) => {
+          if (
+            rule instanceof CSSMediaRule &&
+            rule.media &&
+            rule.media.mediaText.includes("print")
+          ) {
+            Array.from(rule.cssRules).forEach((printRule) => {
+              printCss += `${printRule.cssText}\n`;
+            });
+          }
+        });
+      } catch (error) {
+        // Ignore inaccessible stylesheets
+      }
+    });
+
+    const printStyle = clonedDocument.createElement("style");
+
+    printStyle.setAttribute(
+      "data-capacity-send-pdf-print-styles",
+      "true"
+    );
+
+    printStyle.textContent = printCss;
+
+    clonedDocument.head.appendChild(printStyle);
+
+    /*
+     * Override PRINT SAFETY rule.
+     */
+    const overrideStyle = clonedDocument.createElement("style");
+
+    overrideStyle.setAttribute(
+      "data-capacity-send-pdf-overrides",
+      "true"
+    );
+
+    overrideStyle.textContent = `
+      .capacity-dash__send-overlay {
+        display: none !important;
+      }
+
+      .capacity-dash__send-report-capture {
+        display: block !important;
+        visibility: visible !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 210mm !important;
+        height: auto !important;
+        opacity: 1 !important;
+        overflow: visible !important;
+        z-index: auto !important;
+        background: #ffffff !important;
+      }
+
+      .capacity-dash__send-report-capture .capacity-dash__print {
+        display: block !important;
+        visibility: visible !important;
+        position: relative !important;
+        width: 210mm !important;
+        height: auto !important;
+      }
+
+      .capacity-dash__send-report-capture .capacity-dash__print-page {
+        display: block !important;
+        visibility: visible !important;
+        position: relative !important;
+        width: 210mm !important;
+        min-height: 260mm !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+    `;
+
+    clonedDocument.head.appendChild(overrideStyle);
+  },
+});
+
+  /*
+   * Safety check:
+   * html2canvas ne valid canvas generate kiya hai ya nahi.
+   */
+  if (
+    !canvas.width ||
+    !canvas.height ||
+    !Number.isFinite(canvas.width) ||
+    !Number.isFinite(canvas.height)
+  ) {
+    throw new Error(
+      `Could not generate page ${index + 1}. ` +
+        `Canvas size: ${canvas.width} × ${canvas.height}`
+    );
+  }
+
+  const imageData = canvas.toDataURL("image/jpeg", 0.92);
+
+  const pdfWidth = 210;
+  const pdfHeight = 297;
+
+  const canvasWidth = canvas.width;
+  const canvasHeight = canvas.height;
+
+  const imageRatio = canvasWidth / canvasHeight;
+  const pageRatio = pdfWidth / pdfHeight;
+
+  let renderWidth;
+  let renderHeight;
+
+  if (imageRatio > pageRatio) {
+    renderWidth = pdfWidth;
+    renderHeight = pdfWidth / imageRatio;
+  } else {
+    renderHeight = pdfHeight;
+    renderWidth = pdfHeight * imageRatio;
+  }
+
+  const x = (pdfWidth - renderWidth) / 2;
+  const y = (pdfHeight - renderHeight) / 2;
+
+  /*
+   * Final safety check before jsPDF.addImage()
+   */
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(renderWidth) ||
+    !Number.isFinite(renderHeight) ||
+    renderWidth <= 0 ||
+    renderHeight <= 0
+  ) {
+    throw new Error(
+      `Invalid PDF coordinates on page ${index + 1}: ` +
+        `x=${x}, y=${y}, width=${renderWidth}, height=${renderHeight}`
+    );
+  }
+
+  if (index > 0) {
+    pdf.addPage();
+  }
+
+  pdf.addImage(
+    imageData,
+    "JPEG",
+    x,
+    y,
+    renderWidth,
+    renderHeight,
+    undefined,
+    "FAST"
+  );
+}
+
+  return pdf.output("blob");
+};
+
+
+/**
+ * Create the current Capacity Dashboard report and send it to the
+ * communication channels selected by the user.
+ */
+const sendCapacityPdf = async () => {
+  if (!rows.length) {
+    setSendError("Load Capacity Dashboard data before sending a report.");
+    return;
+  }
+
+  if (!selectedChannelIds.length) {
+    setSendError("Select at least one communication channel.");
+    return;
+  }
+
+  setSendingPdf(true);
+  setSendError("");
+  setSendSuccess("");
+
+  try {
+    const pdfBlob = await buildCapacityPdfBlob();
+
+    const pdfBase64 = await blobToBase64(pdfBlob);
+
+    const safeAgentName =
+      (payload?.agent_name || agentName || "capacity-report")
+        .trim()
+        .replace(/[^\w.-]+/g, "_");
+
+    const filename = `capacity_report_${safeAgentName}_${Date.now()}.pdf`;
+
+    const result = await sendCommunication({
+      title: "Capacity Monitoring Report",
+      message: `Capacity Monitoring Report for ${
+        payload?.agent_name || agentName
+      }. Reporting period: ${periodText}.`,
+      severity: "high",
+      channel_ids: selectedChannelIds,
+      pdf_base64: pdfBase64,
+      pdf_filename: filename,
+    });
+
+    const sent = result?.sent ?? 0;
+    const total = result?.total ?? selectedChannelIds.length;
+
+    setSendSuccess(
+      `${sent} of ${total} selected channel${
+        total === 1 ? "" : "s"
+      } processed successfully.`
+    );
+  } catch (err) {
+    setSendError(
+      err?.message ||
+        "Unable to generate or send the Capacity Monitoring Report."
+    );
+  } finally {
+    setSendingPdf(false);
+
+    // Remove the hidden PrintReport after the capture finishes.
+    setSendReportReady(false);
+  }
+};
+
+
 
   /** Mirror the scope into the URL, so a refresh or a shared link keeps it. */
   const syncUrl = useCallback(
@@ -1610,6 +2113,20 @@ export default function CapacityDashboard() {
           >
             {printing ? "Preparing…" : "Export PDF"}
           </button>
+
+          <button
+  className="capacity-dash__btn capacity-dash__btn--primary"
+  type="button"
+  onClick={openSendModal}
+  disabled={!rows.length || printing || sendingPdf}
+  title={
+    rows.length
+      ? "Send the Capacity Monitoring Report through communication channels"
+      : "Load data first"
+  }
+>
+  {sendingPdf ? "Sending…" : "Send PDF"}
+</button>
 
           <button
             className="capacity-dash__btn capacity-dash__btn--icon"
@@ -1803,6 +2320,216 @@ export default function CapacityDashboard() {
         </>
       )}
 
+      {sendModalOpen && (
+  <div
+    className="capacity-dash__send-overlay"
+    role="presentation"
+    onMouseDown={(event) => {
+      if (event.target === event.currentTarget) {
+        closeSendModal();
+      }
+    }}
+  >
+    <section
+      className="capacity-dash__send-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="capacity-send-title"
+    >
+      <header className="capacity-dash__send-header">
+        <div>
+          <p className="capacity-dash__send-eyebrow">
+            COMMUNICATION CHANNELS
+          </p>
+
+          <h2
+            className="capacity-dash__send-title"
+            id="capacity-send-title"
+          >
+            Send Capacity Report
+          </h2>
+
+          <p className="capacity-dash__send-subtitle">
+            Select the channels that should receive this Capacity Monitoring
+            Report.
+          </p>
+        </div>
+
+        <button
+          className="capacity-dash__send-close"
+          type="button"
+          onClick={closeSendModal}
+          disabled={sendingPdf}
+          aria-label="Close send report dialog"
+        >
+          ×
+        </button>
+      </header>
+
+      <div className="capacity-dash__send-body">
+
+        {sendError && (
+          <div
+            className="capacity-dash__send-error"
+            role="alert"
+          >
+            {sendError}
+          </div>
+        )}
+
+        {sendSuccess && (
+          <div
+            className="capacity-dash__send-success"
+            role="status"
+          >
+            {sendSuccess}
+          </div>
+        )}
+
+        {channelsLoading ? (
+          <div className="capacity-dash__send-loading">
+            Loading communication channels…
+          </div>
+        ) : channels.length === 0 ? (
+          <div className="capacity-dash__send-empty">
+            No communication channels have been added yet.
+          </div>
+        ) : (
+          <div className="capacity-dash__channel-list">
+
+            {channels.map((channel) => {
+              const readiness = readinessForChannel(channel.id);
+
+              const ready =
+                readiness == null
+                  ? null
+                  : Boolean(readiness.ready);
+
+              const supportsPdf =
+                readiness != null &&
+                Boolean(readiness.supports_pdf);
+
+              return (
+                <label
+                  className={`capacity-dash__channel ${
+                    selectedChannelIds.includes(channel.id)
+                      ? "capacity-dash__channel--selected"
+                      : ""
+                  } ${
+                    ready === false
+                      ? "capacity-dash__channel--not-ready"
+                      : ""
+                  }`}
+                  key={channel.id}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedChannelIds.includes(channel.id)}
+                    onChange={() =>
+                      toggleChannelSelection(channel.id)
+                    }
+                    disabled={sendingPdf}
+                  />
+
+                  <div className="capacity-dash__channel-main">
+
+                    <div className="capacity-dash__channel-name">
+                      {channel.name}
+                    </div>
+
+                    <div className="capacity-dash__channel-value">
+                      {channel.value}
+                    </div>
+
+                    <div className="capacity-dash__channel-meta">
+
+                      <span className="capacity-dash__channel-type">
+                        {channel.type}
+                      </span>
+
+                      {ready === true && (
+                        <span className="capacity-dash__channel-ready">
+                          Ready
+                        </span>
+                      )}
+
+                      {ready === false && (
+                        <span className="capacity-dash__channel-not-ready">
+                          Not configured
+                        </span>
+                      )}
+
+                      {supportsPdf && (
+                        <span className="capacity-dash__channel-pdf">
+                          PDF supported
+                        </span>
+                      )}
+
+                      {readiness && !supportsPdf && (
+                        <span className="capacity-dash__channel-message-only">
+                          Message only
+                        </span>
+                      )}
+
+                    </div>
+
+                    {ready === false && readiness?.note && (
+                      <div className="capacity-dash__channel-note">
+                        {readiness.note}
+                      </div>
+                    )}
+
+                  </div>
+                </label>
+              );
+            })}
+
+          </div>
+        )}
+
+      </div>
+
+      <footer className="capacity-dash__send-footer">
+
+        <div className="capacity-dash__send-selection">
+          {selectedChannelIds.length} selected
+        </div>
+
+        <div className="capacity-dash__send-actions">
+
+          <button
+            className="capacity-dash__btn"
+            type="button"
+            onClick={closeSendModal}
+            disabled={sendingPdf}
+          >
+            Cancel
+          </button>
+
+          <button
+            className="capacity-dash__btn capacity-dash__btn--primary"
+            type="button"
+            onClick={sendCapacityPdf}
+            disabled={
+              channelsLoading ||
+              !selectedChannelIds.length ||
+              sendingPdf
+            }
+          >
+            {sendingPdf
+              ? "Generating & Sending…"
+              : "Send Report"}
+          </button>
+
+        </div>
+
+      </footer>
+    </section>
+  </div>
+)}
+
+      
+
       {printing && (
         <PrintReport
           payload={payload}
@@ -1813,6 +2540,25 @@ export default function CapacityDashboard() {
           theme={theme}
         />
       )}
+
+      {sendReportReady && (
+  <div
+    ref={sendReportRef}
+    className="capacity-dash__send-report-capture"
+    aria-hidden="true"
+  >
+    <PrintReport
+      payload={payload}
+      rows={rows}
+      gaps={gaps}
+      stats={STATS}
+      periodText={periodText}
+      theme="light"
+    />
+  </div>
+)}
+
+      
     </div>
   );
 }
