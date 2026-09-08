@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { logout } from "../api/api";
-import { lastHoursInputs } from "../Reports/timeRange";
 import "./Dashboard.css";
 import { FaLinux, FaWindows } from "react-icons/fa6";
 import {
@@ -27,15 +26,6 @@ const STATUS_COLORS = {
   pending: "#ffd700",
   neverConnected: "#4a4a4a",
 };
-// Quick ranges offered by the "Create SOC2 report" form, in hours.
-const SOC2_PRESET_HOURS = [1, 2, 6, 12, 24, 48, 168];
-
-function soc2PresetLabel(hours) {
-  if (hours < 24) return `Last ${hours} hour${hours === 1 ? "" : "s"}`;
-  const days = hours / 24;
-  return `Last ${days} day${days === 1 ? "" : "s"}`;
-}
-
 const OS_COLORS = ["#4a9fd8", "#7cb342", "#f44336", "#9c27b0", "#ff9800"];
 const GROUP_COLORS = ["#00a86b", "#4a9fd8", "#f44336", "#9c27b0", "#ff9800"];
 
@@ -50,14 +40,6 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 function Dashboard() {
   const [agents, setAgents] = useState([]);
   const [selectedAgents, setSelectedAgents] = useState(new Set());
-  // "Create SOC2 report" mode: the row checkboxes and the report form only
-  // exist while it is on. From/To are "YYYY-MM-DDTHH:mm" (IST wall clock, what
-  // the datetime-local inputs speak); toggleSoc2Mode seeds them on the way in.
-  const [soc2Mode, setSoc2Mode] = useState(false);
-  const [soc2From, setSoc2From] = useState("");
-  const [soc2To, setSoc2To] = useState("");
-  const [soc2Preset, setSoc2Preset] = useState("12");
-  const [soc2Error, setSoc2Error] = useState("");
   // Chart data — kept as the API's own aggregate counts, not recomputed
   // from the (possibly filtered/paginated) agents table, since these
   // represent the full account-wide picture regardless of what's on screen.
@@ -481,17 +463,6 @@ function Dashboard() {
     paginatedAgents.length > 0 &&
     paginatedAgents.every((agent) => selectedAgents.has(agent.id));
 
-  // "Select all" works on every agent the search matches, not just the page on
-  // screen — a 10-row page is a display choice, not a scope.
-  const allFilteredSelected =
-    filteredAgents.length > 0 &&
-    filteredAgents.every((agent) => selectedAgents.has(agent.id));
-
-  // Every registered agent is ticked: the report can then be run once, unscoped,
-  // instead of once per agent.
-  const everyAgentSelected =
-    agents.length > 0 && agents.every((agent) => selectedAgents.has(agent.id));
-
   const handleDeployAgent = () => {
     navigate("/app/installation");
   };
@@ -612,105 +583,6 @@ function Dashboard() {
       newSelected.add(agentId);
     }
     setSelectedAgents(newSelected);
-  };
-
-  // ── "Create SOC2 report" ──────────────────────────────────────────────
-  /**
-   * Turning the mode on seeds the default window (last 12 hours) and closes any
-   * open services row, so the first column means one thing at a time. Turning it
-   * off drops the selection, so a stale set cannot leak into the next run.
-   */
-  const toggleSoc2Mode = () => {
-    setSoc2Mode((on) => {
-      if (on) {
-        setSelectedAgents(new Set());
-        setSoc2Error("");
-        return false;
-      }
-      const seed = lastHoursInputs(12);
-      setSoc2From(seed.from);
-      setSoc2To(seed.to);
-      setSoc2Preset("12");
-      setSoc2Error("");
-      setExpandedAgent(null);
-      return true;
-    });
-  };
-
-  /**
-   * One click for the whole list: tick every agent the current search matches,
-   * or untick them all when they already are.
-   */
-  const toggleSelectAllAgents = () => {
-    if (allFilteredSelected) {
-      setSelectedAgents(new Set());
-      return;
-    }
-    setSelectedAgents(new Set(filteredAgents.map((agent) => agent.id)));
-    setSoc2Error("");
-  };
-
-  const applySoc2Preset = (hours) => {
-    const next = lastHoursInputs(hours);
-    setSoc2Preset(String(hours));
-    setSoc2From(next.from);
-    setSoc2To(next.to);
-    setSoc2Error("");
-  };
-
-  // Editing a field by hand means the window no longer matches a preset.
-  const onSoc2FromChange = (value) => {
-    setSoc2From(value);
-    setSoc2Preset("custom");
-  };
-  const onSoc2ToChange = (value) => {
-    setSoc2To(value);
-    setSoc2Preset("custom");
-  };
-
-  /**
-   * One report per selected agent, each in its own tab: the SOC2 report is
-   * scoped to a single agent, and `agent`/`from`/`to` are what it reads on
-   * arrival. Selecting several agents means several tabs, which the browser may
-   * ask to allow.
-   *
-   * The exception is "every agent": the report already covers the whole estate
-   * when no agent is named, so that runs as a single unscoped report rather than
-   * one tab per agent.
-   */
-  const handleGenerateSoc2 = () => {
-    const chosen = agents.filter((agent) => selectedAgents.has(agent.id));
-    if (chosen.length === 0) {
-      setSoc2Error("Select at least one agent.");
-      return;
-    }
-    if (!soc2From || !soc2To) {
-      setSoc2Error("Pick both a From and a To date/time.");
-      return;
-    }
-    // both are "YYYY-MM-DDTHH:mm", so a string compare is a chronological one
-    if (soc2From >= soc2To) {
-      setSoc2Error("From must be before To.");
-      return;
-    }
-
-    setSoc2Error("");
-
-    const openReport = (params) =>
-      window.open(
-        `/app/reports/soc2?${new URLSearchParams(params).toString()}`,
-        "_blank",
-        "noopener,noreferrer"
-      );
-
-    if (everyAgentSelected) {
-      openReport({ from: soc2From, to: soc2To });
-      return;
-    }
-
-    chosen.forEach((agent) =>
-      openReport({ agent: agent.name, from: soc2From, to: soc2To })
-    );
   };
 
   const handleAgentAction = (agentId, agentName) => {
@@ -1900,20 +1772,6 @@ function Dashboard() {
             )
           </h2>
           <div className="table-tools">
-            <button
-              type="button"
-              className={`btn-soc2 ${soc2Mode ? "active" : ""}`}
-              onClick={toggleSoc2Mode}
-              aria-pressed={soc2Mode}
-              title={
-                soc2Mode
-                  ? "Leave selection mode"
-                  : "Pick agents and a time window, then generate their SOC2 reports"
-              }
-            >
-              {soc2Mode ? "✕ Cancel" : "🛡 Create SOC2 report"}
-            </button>
-
             <div className="table-search">
               <input
                 type="text"
@@ -1952,22 +1810,6 @@ function Dashboard() {
           </div>
 
           <div className="table-actions">
-            {/* Selection mode: the "+" column becomes checkboxes and the
-                report form appears under the header. */}
-            <button
-              type="button"
-              className={`btn-soc2 ${soc2Mode ? "active" : ""}`}
-              onClick={toggleSoc2Mode}
-              aria-pressed={soc2Mode}
-              title={
-                soc2Mode
-                  ? "Leave selection mode"
-                  : "Pick agents and a time window, then generate their SOC2 reports"
-              }
-            >
-              {soc2Mode ? "✕ Cancel" : "🛡 Create SOC2 report"}
-            </button>
-
             <div className="table-search">
               <span className="search-icon">⌕</span>
 
@@ -2005,100 +1847,6 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Selection-mode form: the window the selected reports cover. */}
-        {soc2Mode && (
-          <form
-            className="soc2-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleGenerateSoc2();
-            }}
-          >
-            <div className="soc2-form-row">
-              <label className="soc2-form-field">
-                <span className="soc2-form-label">Range</span>
-                <select
-                  className="soc2-form-select"
-                  value={soc2Preset}
-                  onChange={(e) => {
-                    if (e.target.value !== "custom") applySoc2Preset(Number(e.target.value));
-                    else setSoc2Preset("custom");
-                  }}
-                >
-                  {SOC2_PRESET_HOURS.map((h) => (
-                    <option key={h} value={String(h)}>
-                      {soc2PresetLabel(h)}
-                    </option>
-                  ))}
-                  <option value="custom">Custom…</option>
-                </select>
-              </label>
-
-              <label className="soc2-form-field">
-                <span className="soc2-form-label">From (IST)</span>
-                <input
-                  type="datetime-local"
-                  className="soc2-form-input"
-                  value={soc2From}
-                  max={soc2To}
-                  onChange={(e) => onSoc2FromChange(e.target.value)}
-                />
-              </label>
-
-              <label className="soc2-form-field">
-                <span className="soc2-form-label">To (IST)</span>
-                <input
-                  type="datetime-local"
-                  className="soc2-form-input"
-                  value={soc2To}
-                  min={soc2From}
-                  onChange={(e) => onSoc2ToChange(e.target.value)}
-                />
-              </label>
-
-              <div className="soc2-form-actions">
-                <button
-                  type="button"
-                  className="btn-soc2-selectall"
-                  onClick={toggleSelectAllAgents}
-                  disabled={filteredAgents.length === 0}
-                  title={
-                    allFilteredSelected
-                      ? "Clear the selection"
-                      : `Select all ${filteredAgents.length} agents${searchTerm ? " matching the search" : ""}`
-                  }
-                >
-                  {allFilteredSelected
-                    ? "Clear all"
-                    : `Select all (${filteredAgents.length})`}
-                </button>
-                <span className="soc2-form-count">
-                  {selectedAgents.size} of {agents.length} selected
-                </span>
-                <button
-                  type="submit"
-                  className="btn-soc2-generate"
-                  disabled={selectedAgents.size === 0}
-                >
-                  Generate report
-                </button>
-              </div>
-            </div>
-
-            {soc2Error ? (
-              <div className="soc2-form-error">{soc2Error}</div>
-            ) : (
-              <div className="soc2-form-hint">
-                {everyAgentSelected
-                  ? "Every agent is selected — this runs as one report covering the whole estate."
-                  : selectedAgents.size > 1
-                    ? `Generate opens ${selectedAgents.size} tabs, one per agent — your browser may ask to allow pop-ups.`
-                    : "Tick the agents in the table, or use Select all, then generate."}
-              </div>
-            )}
-          </form>
-        )}
-
         <table className="agents-table">
           <thead>
             <tr>
@@ -2119,28 +1867,7 @@ function Dashboard() {
               <th>Architecture</th>
               <th>Status</th>
               <th>Actions</th> */}
-              <th className="col-expand">
-                {soc2Mode && (
-                  <input
-                    type="checkbox"
-                    className="soc2-check"
-                    checked={allFilteredSelected}
-                    // some but not all: the box shows a dash, not a tick
-                    ref={(el) => {
-                      if (el)
-                        el.indeterminate =
-                          !allFilteredSelected && selectedAgents.size > 0;
-                    }}
-                    onChange={toggleSelectAllAgents}
-                    title={
-                      allFilteredSelected
-                        ? "Clear the selection"
-                        : `Select all ${filteredAgents.length} agents${searchTerm ? " matching the search" : ""}`
-                    }
-                    aria-label="Select all agents"
-                  />
-                )}
-              </th>
+              <th className="col-expand" aria-label="Show available services" />
               <th>ID</th>
               <th>Agent Name</th>
               <th>IP Address</th>
@@ -2166,37 +1893,20 @@ function Dashboard() {
                 <Fragment key={agent.id}>
                   <tr>
                     <td className="col-expand">
-                      {soc2Mode ? (
-                        <input
-                          type="checkbox"
-                          className="soc2-check"
-                          checked={selectedAgents.has(agent.id)}
-                          onChange={() => handleSelectAgent(agent.id)}
-                          aria-label={`Select ${agent.name}`}
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          className={`btn-expand ${expandedAgent === agent.name ? "open" : ""}`}
-                          onClick={() => handleToggleServices(agent.name)}
-                          title={
-                            expandedAgent === agent.name
-                              ? "Hide available services"
-                              : "Show available services"
-                          }
-                          aria-expanded={expandedAgent === agent.name}
-                        >
-                          {expandedAgent === agent.name ? "−" : "+"}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className={`btn-expand ${expandedAgent === agent.name ? "open" : ""}`}
+                        onClick={() => handleToggleServices(agent.name)}
+                        title={
+                          expandedAgent === agent.name
+                            ? "Hide available services"
+                            : "Show available services"
+                        }
+                        aria-expanded={expandedAgent === agent.name}
+                      >
+                        {expandedAgent === agent.name ? "−" : "+"}
+                      </button>
                     </td>
-                    {/* <td>
-                    <input
-                      type="checkbox"
-                      checked={selectedAgents.has(agent.id)}
-                      onChange={() => handleSelectAgent(agent.id)}
-                    />
-                  </td> */}
                     <td>{agent.id}</td>
                     {/* <td> */}
                     {/* </td>

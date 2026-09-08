@@ -61,9 +61,9 @@ const Sidebar = ({ isOpen, onClose }) => {
     },
     {
       id: "reports",
-      label: "Reports",
+      label: "SOC2Reports",
       icon: LuChartNoAxesColumn,
-      href: "/reports",
+      href: "/reports/soc2",
     },
     {
       id: "activity",

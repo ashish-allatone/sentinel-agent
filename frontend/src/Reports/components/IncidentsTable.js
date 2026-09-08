@@ -1,12 +1,18 @@
 import React, { useMemo, useState } from "react";
 
+import useCopyFlash from "../../hooks/useCopyFlash";
+
 /**
  * props:
- *  - incidents: [{ date, severity, category, description, agent_name, mitre_technique, sortTs? }]
+ *  - incidents: [{ date, severity, category, description, descriptionFull, agent_name, mitre_technique, sortTs? }]
  *              `date` is the displayed label; the optional `sortTs` (epoch ms) is
  *              what the date column sorts on, because a label without a year
  *              ("Jul 30, 02:30") does not parse back to the right instant.
  *  - loading
+ *
+ * The description is the column worth lifting out of here — it names the file,
+ * the command or the address the incident is about — so clicking it copies the
+ * whole sentence, elided or not.
  *
  * Click a column header to sort by it. Default sort: date descending.
  */
@@ -24,6 +30,7 @@ const SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
 export default function IncidentsTable({ incidents = [], loading = false }) {
   const [sortKey, setSortKey] = useState("date");
   const [sortDir, setSortDir] = useState("desc"); // default: date descending
+  const [flash, copy] = useCopyFlash();
 
   const sorted = useMemo(() => {
     const copy = [...incidents];
@@ -74,7 +81,7 @@ export default function IncidentsTable({ incidents = [], loading = false }) {
 
   return (
     <div className="inc-table-wrap">
-      <table className="inc-table">
+      <table className="inc-table soc2-incidents">
         <thead>
           <tr>
             {COLUMNS.map((c) => (
@@ -99,7 +106,29 @@ export default function IncidentsTable({ incidents = [], loading = false }) {
                 <span className={`sev-badge sev-${inc.severity}`}>{inc.severity}</span>
               </td>
               <td>{inc.category}</td>
-              <td>{inc.description}</td>
+              <td className="inc-desc">
+                {inc.description ? (
+                  <button
+                    type="button"
+                    className={`soc2-copy ${
+                      flash.id === String(i) ? (flash.ok ? "copied" : "failed") : ""
+                    }`}
+                    onClick={() => copy(String(i), inc.description)}
+                    title={inc.description}
+                  >
+                    <span className="soc2-copy-text">{inc.description}</span>
+                    <span className="soc2-copy-flag" aria-hidden="true">
+                      {flash.id === String(i)
+                        ? flash.ok
+                          ? "✓"
+                          : "⚠"
+                        : "⧉"}
+                    </span>
+                  </button>
+                ) : (
+                  inc.description
+                )}
+              </td>
               <td>{inc.agent_name}</td>
               <td className="mitre-cell">{inc.mitre_technique}</td>
             </tr>

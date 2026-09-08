@@ -3,8 +3,7 @@ import platform
 import uuid
 from collectors.dbprobe.detect import detect_engines
 from collectors.webprobe.detect import detect_servers
-from utils.command_registry import get_handler
-from .command_registry import get_handler
+from utils.command_registry import get_handler , get_status , set_status , register_thread , remove_thread
 from collectors.flyprobe.detect import detect_fly
 from collectors.appprobe.detect import detect_appservers
 
@@ -63,7 +62,13 @@ async def handle_command(payload):
     args = payload.get("args")
 
     if command == "active_test":
-        return {"success" : True}
+        status = get_status()
+        return {"success" : True , "status" : status}
+
+    if command == "update_status":
+        status = set_status(args.get("status"))
+        return {"success": True , "status" : status}
+
     
     if command ==  "list_services":
         det=[]
@@ -77,34 +82,45 @@ async def handle_command(payload):
 
 
     if inspector is not None:
+        service_name = args.get("service_name")
+
         if command == "start_engine":
-            return inspector.start(args)
+            ins = inspector
+            return register_thread(service_name , ins , args)
             
         if command == "stop_engine":
-            return inspector.stop(args.get("engine"))
+            return remove_thread(service_name)
+
+
     if web_inspector is not None:
-        if command == "start_web":            
-            return web_inspector.start(args)
+        service_name = args.get("service_name")
+
+        if command == "start_web":  
+            w_ins = web_inspector
+            return register_thread(service_name , w_ins , args)      
                     
         if command == "stop_web":
-            return web_inspector.stop(args.get("engine"))
+            return remove_thread(service_name)
+        
     if fly_inspector is not None:
-        if command == "start_fly":
-            # source=run_fly_detect(token=args.get('token'), prefer=args.get("prefer"))
-            
-                # print(detail)
-            return fly_inspector.start(args.get('detail'))
-        if command == "stop_fly":
-            return fly_inspector.stop(args.get("engine"))
+        service_name = args.get("service_name")
 
+        if command == "start_fly":
+            f_ins = fly_inspector
+            return register_thread(service_name , f_ins , args)
+        if command == "stop_fly":
+            return remove_thread(service_name)
     
     if App_inspector is not None:
+        service_name = args.get("service_name")
+
         if command == "start_appserver":  
-            # print(args)          
-            return App_inspector.start(args.get('detail'))
+            a_ins = App_inspector
+
+            return register_thread(service_name , a_ins , args)
                     
         if command == "stop_appserver":
-            return App_inspector.stop(args.get('source'))
+            return remove_thread(service_name)
     return []  
 
 if __name__ == "__main__":

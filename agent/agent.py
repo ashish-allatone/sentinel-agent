@@ -15,9 +15,8 @@ from collectors.harddisk_collector import HardDiskCollector
 from collectors.capacity_monitoring_collector import ResourceCollector
 from utils.utils import get_machine_info
 from collectors.engines_handler import EnginesHandler
-from utils.command_registry import register
+from utils.command_registry import register , add_static_collector
 from collectors.web_inspector import WebInspector
-from utils.command_registry import register
 from collectors.fly_inspector import FlyInspector
 from collectors.appserver_inspector import AppServerInspector
 
@@ -102,6 +101,7 @@ class SentinelAgent:
                 poll_interval = 10.0,
             )
             rc.start()
+            add_static_collector(rc)
             self._collectors.append(rc)
             print("Resource Collector started")
         except Exception as e:
@@ -118,6 +118,7 @@ class SentinelAgent:
                 recursive   = True,
                 use_polling = False,
             )
+            add_static_collector(fc)
             fc.start()
             self._collectors.append(fc)
             print("File Collector started")
@@ -133,6 +134,7 @@ class SentinelAgent:
                 dispatch       = dispatch,
                 machine_info = self.machine_info
             )
+            add_static_collector(ac)
             ac.start()
             self._collectors.append(ac)
             print("Auth Collector started")
@@ -147,7 +149,9 @@ class SentinelAgent:
                 poll_interval   = 2.0,
                 track_bandwidth = True
             )
+            add_static_collector(nc)
             nc.start()
+
             self._collectors.append(nc)
             print(" Network Collector started")
         except Exception as e:
@@ -162,6 +166,7 @@ class SentinelAgent:
                 resource_interval = 30.0,
                 hash_executables  = True
             )
+            add_static_collector(pc)
             pc.start()
             self._collectors.append(pc)
             print("Process Collector started")
@@ -177,6 +182,7 @@ class SentinelAgent:
                 scan_on_connect          = True,
                 transfer_threshold_bytes = 524288000,
             )
+            add_static_collector(uc)
             uc.start()
             self._collectors.append(uc)
             print("USB Collector started")

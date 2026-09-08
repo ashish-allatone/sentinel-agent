@@ -26,7 +26,7 @@ async def check_active_status():
                         result = await check_active(a.agent_name)
                         if result:
                             a.is_active = True
-                            a.status = "active"
+                            a.status = res.get("status")
                         else:
                             a.is_active = False
                             a.status = "disconnected" if a.mac_address is not None else "never_connected"

@@ -8,7 +8,8 @@ import React from "react";
  *  - onSelect     : optional (agent) => void. When given, each row becomes a
  *                   button — the SOC2 report uses it to scope itself to one
  *                   agent. Omit it (as the printed report does) for a plain list.
- *  - selectedName : the currently scoped agent's name, marked as pressed.
+ *  - selectedNames: Set (or array) of the scoped agents' names. Every row in it
+ *                   is marked as pressed.
  */
 const DOT = {
   online: "#5a9216",
@@ -22,7 +23,17 @@ const BADGE_CLASS = {
   offline: "agent-badge-offline",
 };
 
-export default function AgentsTable({ agents = [], loading = false, onSelect, selectedName }) {
+export default function AgentsTable({
+  agents = [],
+  loading = false,
+  onSelect,
+  selectedNames,
+}) {
+  const isSelected = (name) =>
+    selectedNames instanceof Set
+      ? selectedNames.has(name)
+      : Array.isArray(selectedNames) && selectedNames.includes(name);
+
   if (loading) {
     return (
       <div className="agents-list">
@@ -61,7 +72,7 @@ export default function AgentsTable({ agents = [], loading = false, onSelect, se
           );
         }
 
-        const selected = Boolean(selectedName) && selectedName === a.name;
+        const selected = isSelected(a.name);
         return (
           <button
             type="button"
@@ -69,7 +80,7 @@ export default function AgentsTable({ agents = [], loading = false, onSelect, se
             className={`agent-row agent-row-btn ${selected ? "selected" : ""}`}
             onClick={() => onSelect(a)}
             aria-pressed={selected}
-            title={selected ? `Clear the filter on ${a.name}` : `Report on ${a.name} only`}
+            title={`Report on ${a.name} only`}
           >
             {body}
           </button>

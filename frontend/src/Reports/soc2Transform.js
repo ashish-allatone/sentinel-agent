@@ -169,10 +169,6 @@ function verb(n, singular, pluralForm) {
   return Number(n) === 1 ? singular : pluralForm;
 }
 
-function truncate(text, max = 90) {
-  const s = String(text == null ? "" : text);
-  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
-}
 
 /**
  * Join the parts of a description that are actually present.
@@ -190,7 +186,7 @@ function describeProcess(e) {
   const detail = e.command_line || e.executable;
   return joinParts([
     e.process_name || "unknown process",
-    detail ? `— ${truncate(detail, 70)}` : "",
+    detail ? `— ${detail}` : "",
     e.user ? `(${e.user})` : "",
     e.ioc_match ? `· IOC ${e.ioc_match}` : "",
   ]);
@@ -425,7 +421,8 @@ function buildAuth(payload, bucket) {
         rows: (p.privileged_access || []).map((r) => ({
           time: fmtIst(r.timestamp),
           user: r.username || "—",
-          command: truncate(r.sudo_command, 70),
+          command: r.sudo_command || "—",
+          commandFull: r.sudo_command || "",
           outcome: r.outcome || "—",
           ip: r.source_ip || "—",
         })),
@@ -519,7 +516,7 @@ function buildProcess(payload, bucket) {
           { key: "process", label: "Process" },
           { key: "pid", label: "PID" },
           { key: "user", label: "User" },
-          { key: "cpu", label: "CPU %" },
+          { key: "cpu", label: "CPU (MB)" },
           { key: "mem", label: "Memory" },
         ],
         rows: (p.top_cpu_events || []).map((r) => ({
@@ -527,7 +524,7 @@ function buildProcess(payload, bucket) {
           process: r.process_name || "—",
           pid: r.pid != null ? r.pid : "—",
           user: r.user || "—",
-          cpu: r.cpu_percent != null ? `${r.cpu_percent}%` : "—",
+          cpu: r.cpu_percent != null ? `${r.cpu_percent}MB` : "—",
           mem: r.memory_rss_mb != null ? `${r.memory_rss_mb} MB` : "—",
         })),
       },
@@ -544,7 +541,8 @@ function buildProcess(payload, bucket) {
         rows: (p.anomalous_events || []).map((r) => ({
           time: fmtIst(r.timestamp),
           process: r.process_name || "—",
-          cmd: truncate(r.command_line, 60),
+          cmd: r.command_line || "—",
+          cmdFull: r.command_line || "",
           user: r.user || "—",
           risk: r.risk_score != null ? r.risk_score : "—",
           mitre: [r.mitre_tactic, r.mitre_technique].filter(Boolean).join(" / ") || "—",
@@ -562,7 +560,8 @@ function buildProcess(payload, bucket) {
         rows: (p.flagged_hashes || []).map((r) => ({
           time: fmtIst(r.timestamp),
           process: r.process_name || "—",
-          sha: truncate(r.sha256, 24),
+          sha: r.sha256 || "—",
+          shaFull: r.sha256 || "",
           ioc: r.ioc_match || "—",
           user: r.user || "—",
         })),
@@ -582,7 +581,10 @@ function buildFile(payload, bucket) {
   const events = (p.notable_events || []).map((e) => ({
     severity: sev(e.severity),
     category: "file",
-    message: `${e.action || "change"} ${truncate(e.file_path, 70)}${e.user_name ? ` (${e.user_name})` : ""}`,
+    message: `${e.action || "change"} ${e.file_path || ""}${e.user_name ? ` (${e.user_name})` : ""}`,
+    // the untruncated path behind the message — EventList copies this, not
+    // the sentence it is embedded in
+    copyValue: e.file_path || "",
     timestamp: fmtIst(e.timestamp),
   }));
 
@@ -648,10 +650,14 @@ function buildFile(payload, bucket) {
         ],
         rows: (p.integrity_changes || []).map((r) => ({
           time: fmtIst(r.timestamp),
-          path: truncate(r.file_path, 46),
-          oldPath: truncate(r.old_path, 46),
-          sha: truncate(r.sha256, 16),
-          oldSha: truncate(r.old_sha256, 16),
+          path: r.file_path || "—",
+          pathFull: r.file_path || "",
+          oldPath: r.old_path || "—",
+          oldPathFull: r.old_path || "",
+          sha: r.sha256 || "—",
+          shaFull: r.sha256 || "",
+          oldSha: r.old_sha256 || "—",
+          oldShaFull: r.old_sha256 || "",
           user: r.user_name || "—",
         })),
       },
@@ -668,7 +674,8 @@ function buildFile(payload, bucket) {
         rows: (p.anomalous_events || []).map((r) => ({
           time: fmtIst(r.timestamp),
           action: r.action || "—",
-          path: truncate(r.file_path, 50),
+          path: r.file_path || "—",
+          pathFull: r.file_path || "",
           user: r.user_name || "—",
           risk: r.risk_score != null ? r.risk_score : "—",
           mitre: [r.mitre_tactic, r.mitre_technique].filter(Boolean).join(" / ") || "—",
@@ -855,8 +862,10 @@ function buildUsb(payload, bucket) {
           time: fmtIst(r.timestamp),
           action: r.action || "—",
           device: [r.vendor, r.model].filter(Boolean).join(" ") || r.label || "—",
-          serial: truncate(r.serial_number, 22),
-          mount: truncate(r.mountpoint, 22),
+          serial: r.serial_number || "—",
+          serialFull: r.serial_number || "",
+          mount: r.mountpoint || "—",
+          mountFull: r.mountpoint || "",
           fs: r.fstype || "—",
           size: fmtBytes(r.size_bytes),
         })),
@@ -872,7 +881,8 @@ function buildUsb(payload, bucket) {
         rows: (p.data_transfers || []).map((r) => ({
           time: fmtIst(r.timestamp),
           device: [r.vendor, r.model].filter(Boolean).join(" ") || r.serial_number || "—",
-          file: truncate(r.file_name || r.file_path, 50),
+          file: r.file_name || r.file_path || "—",
+          fileFull: r.file_path || r.file_name || "",
           bytes: fmtBytes(r.transfer_bytes),
         })),
       },
@@ -904,6 +914,17 @@ const CRITERIA_LABELS = {
  * IncidentsTable rows. `sortTs` keeps the table's date sort on the real instant
  * rather than the formatted label.
  */
+/**
+ * The scope as a single label: one agent by name, several as a count, none
+ * (every agent) as an empty string so callers can fall back to "All agents".
+ */
+function scopeName(names) {
+  const list = Array.isArray(names) ? names.filter(Boolean) : names ? [names] : [];
+  if (list.length === 0) return "";
+  if (list.length === 1) return list[0];
+  return `${list.length} agents`;
+}
+
 function buildIncidents(sections, agentName) {
   const rows = [];
   const push = (section, e, description, severity, mitre) => {
@@ -912,7 +933,7 @@ function buildIncidents(sections, agentName) {
       sortTs: parseApiTs(e.timestamp) || 0,
       severity: sev(severity),
       category: section,
-      description,
+      description: String(description == null ? "" : description),
       agent_name: agentName || "all agents",
       mitre_technique: mitre || "—",
     });
@@ -929,7 +950,7 @@ function buildIncidents(sections, agentName) {
     push(
       "process",
       e,
-      joinParts(["Anomalous execution:", e.process_name || "unknown", truncate(e.command_line, 60)]),
+      joinParts(["Anomalous execution:", e.process_name || "unknown", e.command_line]),
       "medium",
       e.mitre_technique
     )
@@ -937,10 +958,10 @@ function buildIncidents(sections, agentName) {
 
   const file = sections.file || {};
   (file.notable_events || []).forEach((e) =>
-    push("file", e, `${e.action || "change"} ${truncate(e.file_path, 80)}`, e.severity)
+    push("file", e, `${e.action || "change"} ${e.file_path || ""}`, e.severity)
   );
   (file.anomalous_events || []).forEach((e) =>
-    push("file", e, `Anomalous file change: ${e.action || ""} ${truncate(e.file_path, 60)}`, "medium", e.mitre_technique)
+    push("file", e, `Anomalous file change: ${e.action || ""} ${e.file_path || ""}`, "medium", e.mitre_technique)
   );
 
   const network = sections.network || {};
@@ -1279,7 +1300,7 @@ function placeholderView(key, state) {
  * @param {Object<string, Object|null>} sections the five raw payloads, keyed by
  *   section; a `null` slot yields a placeholder view rather than a hole in the
  *   report — pending or failed, per `options.pending`.
- * @param {{agentName?: string, fromDt?: string, toDt?: string, bucket?: string}} params
+ * @param {{agentNames?: string[], fromDt?: string, toDt?: string, bucket?: string}} params
  * @param {{pending?: string[]}} [options] sections whose request is still open
  */
 export function buildSoc2View(sections, params = {}, options = {}) {
@@ -1327,7 +1348,7 @@ export function buildSoc2View(sections, params = {}, options = {}) {
     ? Math.round(scored.reduce((sum, key) => sum + views[key].score, 0) / scored.length)
     : null;
 
-  const incidents = buildIncidents(raw, params.agentName);
+  const incidents = buildIncidents(raw, scopeName(params.agentNames));
 
   // The overview's event feed: the same merged incident stream, newest first, in
   // the shape EventList reads.
@@ -1342,7 +1363,7 @@ export function buildSoc2View(sections, params = {}, options = {}) {
 
   return {
     meta: {
-      agentName: params.agentName || meta.agent_name || "",
+      agentName: scopeName(params.agentNames) || scopeName(meta.agent_name),
       fromDt: params.fromDt || meta.from_dt || "",
       toDt: params.toDt || meta.to_dt || "",
       bucket: params.bucket || "hour",

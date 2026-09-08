@@ -88,14 +88,13 @@ class WebInspector:
         self._driver_error = {}   # server -> message (unrecoverable)
 
     # ── start one server, or many if a list of details is given ──
-    def start(self, detail):
-        if isinstance(detail, (list, tuple)):
-            return [self._start_one(d) for d in detail]
+    def start(self, detail:dict):
         return self._start_one(detail)
 
     def _start_one(self, detail):
         detail = detail or {}
         server = _canon(detail.get("server") or detail.get("engine"))
+        service_name = detail.get("service_name")
         if server not in PROBES:
             return {"ok": False, "server": server, "error": "unknown web server"}
         if server in self._threads and self._threads[server].is_alive():
@@ -104,10 +103,10 @@ class WebInspector:
         params = _build_params(server, detail)
 
         stop = threading.Event()
-        self._stops[server] = stop
-        t = threading.Thread(target=self._loop, name=f"webinspect-{server}",
+        self._stops[service_name] = stop
+        t = threading.Thread(target=self._loop, name=f"webinspect-{server}-{service_name}",
                              daemon=True, args=(server, params, stop))
-        self._threads[server] = t
+        self._threads[service_name] = t
         t.start()
         return {"ok": True, "server": server, "status": "started",
                 "host": params.get("host"), "port": params.get("port"),
@@ -181,21 +180,21 @@ class WebInspector:
         self._dispatch(ev.to_dict(), self._machine_info)
 
     # ── stop one server by name, or many if a list is given ──
-    def stop(self, server):
-        if isinstance(server, (list, tuple)):
-            return [self._stop_one(s) for s in server]
-        return self._stop_one(server)
+    def stop(self, args):
+        server = args.get("server")
+        service_name = args.get("service_name")
+        return self._stop_one(server , service_name)
 
-    def _stop_one(self, server):
+    def _stop_one(self, server , service_name):
         server = _canon(server)
-        stop = self._stops.get(server)
+        stop = self._stops.get(service_name)
         if not stop:
-            return {"ok": False, "server": server, "error": "not running"}
+            return {"ok": False, "server": server,"service_name" : service_name, "error": "not running"}
         stop.set()
-        t = self._threads.get(server)
+        t = self._threads.get(service_name)
         if t:
             t.join(timeout=5)
-        self._threads.pop(server, None)
-        self._stops.pop(server, None)
-        self._driver_error.pop(server, None)
+        self._threads.pop(service_name, None)
+        self._stops.pop(service_name, None)
+        self._driver_error.pop(service_name, None)
         return {"ok": True, "server": server, "status": "stopped"}

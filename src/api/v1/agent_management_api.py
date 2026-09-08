@@ -178,6 +178,24 @@ async def get_available_services(agent_name: str = Query() ,  db: AsyncSession =
 
 
 
+
+
+
+@agent_management_router.get("/toggle_status",  status_code=200)
+async def toggle_Status(agent_name: str = Query() ,action: str = Query()):
+    agent_name = agent_name.strip()
+    action = action.strip()
+
+    result = await mqtt_request(agent_name=agent_name, command = "update_status" , args = {"status" : action})
+    
+    if result is None:
+        raise HTTPException(504, "Agent did not respond (may be offline)")
+    return result 
+    
+
+
+
+
 @agent_management_router.get("/is-valid-agent-name" ,  response_model = standard_success_response[IsValidAgentNameResponse] , status_code = 200)
 async def is_valid_agent_name(agent_name:str = Query() , db: AsyncSession = Depends(get_async_db)):
 
@@ -295,7 +313,7 @@ async def add_credential(req: AddCredentialRequest,
         "host": req.host,
         "port": req.port
     }
-    await mqtt_request(agent_name=req.agent_name, command="stop_engine",args={"engine" : req.engine}) #, timeout=10.0)
+    await mqtt_request(agent_name=req.agent_name, command="stop_engine",args={"engine" : req.engine , "service_name" : req.service_name}) #, timeout=10.0)
     result = await mqtt_request(agent_name=req.agent_name, command="start_engine",args=starting_args )#, timeout=10.0)
 
     res_data = AddCredentialResponse(

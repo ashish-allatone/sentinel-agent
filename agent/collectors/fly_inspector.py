@@ -77,21 +77,20 @@ class FlyInspector:
         self._driver_error = {}
 
     def start(self, detail):
-        if isinstance(detail, (list, tuple)):
-            return [self._start_one(d) for d in detail]
         return self._start_one(detail)
 
     def _start_one(self, detail):
         detail = detail or {}
         sid = _source_id(detail)
-        if sid in self._threads and self._threads[sid].is_alive():
-            return {"ok": False, "source": sid, "error": "already running"}
+        service_name = detail.get("service_name")
+        if service_name in self._threads and self._threads[service_name].is_alive():
+            return {"ok": False, "source": sid,"service_name" : service_name, "error": "already running"}
         params = _build_params(detail)
         stop = threading.Event()
-        self._stops[sid] = stop
-        t = threading.Thread(target=self._loop, name=f"flyinspect-{sid}",
+        self._stops[service_name] = stop
+        t = threading.Thread(target=self._loop, name=f"flyinspect-{sid}={service_name}",
                              daemon=True, args=(sid, params, stop))
-        self._threads[sid] = t
+        self._threads[service_name] = t
         t.start()
         return {"ok": True, "source": sid, "status": "started",
                 "backend": params.get("backend"), "container": params.get("container")}
@@ -154,21 +153,21 @@ class FlyInspector:
     def send(self, ev):
         self._dispatch(ev.to_dict(), self._machine_info)
 
-    def stop(self, source):
-        if isinstance(source, (list, tuple)):
-            return [self._stop_one(s) for s in source]
-        return self._stop_one(source)
+    def stop(self, args):
+        source = args.get("source")
+        service_name = args.get(service_name)
+        return self._stop_one(source , service_name)
 
-    def _stop_one(self, source):
+    def _stop_one(self, source , service_name):
         sid = _source_id(source) if isinstance(source, dict) else str(source)
-        stop = self._stops.get(sid)
+        stop = self._stops.get(service_name)
         if not stop:
-            return {"ok": False, "source": sid, "error": "not running"}
+            return {"ok": False, "source": sid, "service_name" : service_name ,"error": "not running"}
         stop.set()
-        t = self._threads.get(sid)
+        t = self._threads.get(service_name)
         if t:
             t.join(timeout=5)
-        self._threads.pop(sid, None)
-        self._stops.pop(sid, None)
-        self._driver_error.pop(sid, None)
-        return {"ok": True, "source": sid, "status": "stopped"}
+        self._threads.pop(service_name, None)
+        self._stops.pop(service_name, None)
+        self._driver_error.pop(service_name, None)
+        return {"ok": True, "source": sid,"service_name": service_name, "status": "stopped"}

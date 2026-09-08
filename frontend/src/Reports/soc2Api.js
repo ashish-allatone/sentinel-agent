@@ -7,14 +7,17 @@
  *   GET /soc2-report/auth     authentication / access control
  *   GET /soc2-report/usb      removable media
  *
- * Every one takes the same query: from_dt, to_dt, agent_name (optional — omit
+ * Every one takes the same query: from_dt, to_dt, agent_name (optional, and
+ * repeated once per agent — omit
  * for all agents) and bucket ("hour" | "day"). Each answers with the project's
  * standard envelope, so the report body is `res.data.data`.
  *
  * @typedef {Object} Soc2Params
  * @property {string} fromDt     naive ISO, no timezone, e.g. "2026-07-29T16:58:00"
  * @property {string} toDt       naive ISO, no timezone, e.g. "2026-07-30T04:58:59"
- * @property {string} [agentName] one agent; empty/omitted means every agent
+ * @property {string[]} [agentNames] the agents to report on, sent as one
+ *   `agent_name` parameter each; empty/omitted means every agent
+ * @property {string} [agentName] a single agent — shorthand for a one-item `agentNames`
  * @property {"hour"|"day"} [bucket] timeseries resolution (default "hour")
  */
 
@@ -50,11 +53,25 @@ export function sectionPath(section) {
  */
 function toQuery(params) {
   const p = params || {};
-  const agentName = (p.agentName || "").trim();
-  const query = { from_dt: p.fromDt ?? "", to_dt: p.toDt ?? "" };
-  if (agentName) query.agent_name = agentName;
-  query.bucket = p.bucket === "day" ? "day" : "hour";
+  const query = new URLSearchParams();
+  query.set("from_dt", p.fromDt ?? "");
+  query.set("to_dt", p.toDt ?? "");
+  // One `agent_name` per selected agent — the endpoints read them as a list.
+  // Nothing selected sends nothing at all, which the API reads as every agent.
+  agentNamesOf(p).forEach((name) => query.append("agent_name", name));
+  query.set("bucket", p.bucket === "day" ? "day" : "hour");
   return query;
+}
+
+/**
+ * The agents a params object scopes to, de-duplicated and blank-free.
+ * Accepts either `agentNames` (the array) or the single-agent `agentName`.
+ */
+export function agentNamesOf(params) {
+  const p = params || {};
+  const list = Array.isArray(p.agentNames) ? p.agentNames : [];
+  const all = p.agentName ? [...list, p.agentName] : list;
+  return [...new Set(all.map((n) => String(n || "").trim()).filter(Boolean))];
 }
 
 /**
@@ -65,7 +82,9 @@ function toQuery(params) {
  * default serializer un-escapes them, so it is replaced with this.
  */
 function serializeQuery(query) {
-  return new URLSearchParams(query).toString();
+  return query instanceof URLSearchParams
+    ? query.toString()
+    : new URLSearchParams(query).toString();
 }
 
 /** Path + query, relative to the API base. */

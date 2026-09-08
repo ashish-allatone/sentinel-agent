@@ -66,25 +66,24 @@ class EnginesHandler:
         self._driver_error = {}   
 
     # ── start one engine, or many if a list of details is given ──
-    def start(self, detail):
-        if isinstance(detail, (list, tuple)):
-            return [self._start_one(d) for d in detail]
+    def start(self, detail:dict):
         return self._start_one(detail)
 
     def _start_one(self, detail):
-        engine = _canon((detail or {}).get("engine"))
+        engine = _canon(detail.get("engine"))
+        service_name = detail.get("service_name")
         if engine not in INSPECTORS:
             return {"ok": False, "engine": engine, "error": "unknown engine"}
-        if engine in self._threads and self._threads[engine].is_alive():
-            return {"ok": False, "engine": engine, "error": "already running"}
+        if service_name in self._threads and self._threads[service_name].is_alive():
+            return {"ok": False, "engine": engine,"service_name" : service_name , "error": "already running"}
 
         params = _build_params(engine, detail)
 
         stop = threading.Event()
-        self._stops[engine] = stop
-        t = threading.Thread(target=self._loop, name=f"inspect-{engine}",
+        self._stops[service_name] = stop
+        t = threading.Thread(target=self._loop, name=f"inspect-{engine}-{service_name}",
                              daemon=True, args=(engine, params, stop))
-        self._threads[engine] = t
+        self._threads[service_name] = t
         t.start()
         return {"ok": True, "engine": engine, "status": "started",
                 "host": params.get("host"), "port": params.get("port")}
@@ -161,20 +160,20 @@ class EnginesHandler:
         self._dispatch(ev.to_dict(), self._machine_info)
 
     # ── stop one engine by name, or many if a list is given ──
-    def stop(self, engine):
-        if isinstance(engine, (list, tuple)):
-            return [self._stop_one(e) for e in engine]
-        return self._stop_one(engine)
+    def stop(self, args):
+        engine = args.get("engine")
+        service_name = args.get("service_name")
+        return self._stop_one(engine , service_name)
 
-    def _stop_one(self, engine):
+    def _stop_one(self, engine , service_name):
         engine = _canon(engine)
-        stop = self._stops.get(engine)
+        stop = self._stops.get(service_name)
         if not stop:
-            return {"ok": False, "engine": engine, "error": "not running"}
+            return {"ok": False, "engine": engine, "service_name" : service_name , "error": "not running"}
         stop.set()
-        t = self._threads.get(engine)
+        t = self._threads.get(service_name)
         if t:
             t.join(timeout=5)
-        self._threads.pop(engine, None)
-        self._stops.pop(engine, None)
-        return {"ok": True, "engine": engine, "status": "stopped"}
+        self._threads.pop(service_name, None)
+        self._stops.pop(service_name, None)
+        return {"ok": True, "engine": engine, "service_name" : service_name , "status": "stopped"}

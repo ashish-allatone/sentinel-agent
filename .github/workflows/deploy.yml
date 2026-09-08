@@ -30,6 +30,7 @@ jobs:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
+          script_stop: true
           script: |
             cd /home/opc/sentinel-application
 
@@ -47,6 +48,7 @@ jobs:
             docker run -d \
               --name sentinel \
               --restart always \
+              --network sentinel-network \
               -p 8000:8000 \
               -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
               -e JWT_ALGORITHM=${{ secrets.JWT_ALGORITHM }} \
@@ -54,10 +56,14 @@ jobs:
               -e DB_NAME=${{ secrets.DB_NAME }} \
               -e DB_USER=${{ secrets.DB_USER }} \
               -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+              -e GMAIL_USER=${{ secrets.GMAIL_USER }} \
+              -e GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }} \
+              -e GMAIL_FROM=${{ secrets.GMAIL_FROM }} \
+              -e OUTLOOK_USER=${{ secrets.OUTLOOK_USER }} \
+              -e OUTLOOK_PASSWORD=${{ secrets.OUTLOOK_PASSWORD }} \
+              -e OUTLOOK_FROM=${{ secrets.OUTLOOK_FROM }} \
               sentinel-application:latest
 
             echo "Cleaning unused Docker images..."
 
             docker image prune -f
-
-            docker network connect sentinel-network sentinel
