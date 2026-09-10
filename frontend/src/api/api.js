@@ -216,6 +216,13 @@ api.interceptors.request.use(
       );
     }
 
+     // ============================================================
+    // IMPORTANT: Allow FormData requests to use multipart/form-data
+    // ============================================================
+    if (config.data instanceof FormData) {
+      delete config.headers["Content-Type"]
+    }  
+
     return config;
   },
   (error) => {

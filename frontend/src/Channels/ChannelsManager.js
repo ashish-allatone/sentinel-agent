@@ -2,6 +2,12 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import "./ChannelsManager.css";
 import { addChannel, deleteChannel, fetchChannels } from "./channelsApi";
 
+import {
+  addChannelAccount,
+  deleteChannelAccount,
+  fetchChannelAccounts,
+} from "./channelAccountsApi";
+
 /**
  * Channels Manager — backed by the communication-channel API.
  *
@@ -28,7 +34,35 @@ const SERVICES = [
     primary: "email",
     fields: [
       { name: "label", label: "Label", placeholder: "e.g. Work inbox" },
-      { name: "email", label: "Email Address", type: "email", placeholder: "you@company.com", required: true },
+      {
+        name: "email",
+        label: "Email Address",
+        type: "email",
+        placeholder: "you@company.com",
+        required: true,
+      },
+    ],
+  },
+  {
+    id: "outlook",
+    label: "Outlook",
+    icon: "📧",
+    color: "#0078d4",
+    blurb: "Send notifications to an Outlook inbox",
+    primary: "email",
+    fields: [
+      {
+        name: "label",
+        label: "Label",
+        placeholder: "e.g. Office Outlook",
+      },
+      {
+        name: "email",
+        label: "Email Address",
+        type: "email",
+        placeholder: "you@company.com",
+        required: true,
+      },
     ],
   },
   {
@@ -40,7 +74,13 @@ const SERVICES = [
     primary: "phone",
     fields: [
       { name: "label", label: "Label", placeholder: "e.g. On-call phone" },
-      { name: "phone", label: "Phone Number", type: "tel", placeholder: "+91 98765 43210", required: true },
+      {
+        name: "phone",
+        label: "Phone Number",
+        type: "tel",
+        placeholder: "+91 98765 43210",
+        required: true,
+      },
     ],
   },
   {
@@ -52,7 +92,13 @@ const SERVICES = [
     primary: "phone",
     fields: [
       { name: "label", label: "Label", placeholder: "e.g. Alerts phone" },
-      { name: "phone", label: "Phone Number", type: "tel", placeholder: "+91 98765 43210", required: true },
+      {
+        name: "phone",
+        label: "Phone Number",
+        type: "tel",
+        placeholder: "+91 98765 43210",
+        required: true,
+      },
     ],
   },
   {
@@ -64,8 +110,19 @@ const SERVICES = [
     primary: "channel",
     fields: [
       { name: "label", label: "Label", placeholder: "e.g. Team Slack" },
-      { name: "channel", label: "Channel", placeholder: "#alerts", required: true },
-      { name: "webhook", label: "Incoming Webhook URL", type: "url", placeholder: "https://hooks.slack.com/services/…", required: true },
+      {
+        name: "channel",
+        label: "Channel",
+        placeholder: "#alerts",
+        required: true,
+      },
+      {
+        name: "webhook",
+        label: "Incoming Webhook URL",
+        type: "url",
+        placeholder: "https://hooks.slack.com/services/…",
+        required: true,
+      },
     ],
   },
   {
@@ -77,8 +134,12 @@ const SERVICES = [
     primary: "chatId",
     fields: [
       { name: "label", label: "Label", placeholder: "e.g. Ops group" },
-      { name: "chatId", label: "Chat ID / @username", placeholder: "@ops_team or 123456789", required: true },
-      { name: "botToken", label: "Bot Token", placeholder: "123456:ABC-DEF…", required: true },
+      {
+        name: "chatId",
+        label: "Chat ID",
+        placeholder: "-1001234567890",
+        required: true,
+      },
     ],
   },
   {
@@ -90,7 +151,13 @@ const SERVICES = [
     primary: "webhook",
     fields: [
       { name: "label", label: "Label", placeholder: "e.g. Server alerts" },
-      { name: "webhook", label: "Webhook URL", type: "url", placeholder: "https://discord.com/api/webhooks/…", required: true },
+      {
+        name: "webhook",
+        label: "Webhook URL",
+        type: "url",
+        placeholder: "https://discord.com/api/webhooks/…",
+        required: true,
+      },
     ],
   },
   {
@@ -102,7 +169,13 @@ const SERVICES = [
     primary: "webhook",
     fields: [
       { name: "label", label: "Label", placeholder: "e.g. IT Teams" },
-      { name: "webhook", label: "Webhook URL", type: "url", placeholder: "https://outlook.office.com/webhook/…", required: true },
+      {
+        name: "webhook",
+        label: "Webhook URL",
+        type: "url",
+        placeholder: "https://outlook.office.com/webhook/…",
+        required: true,
+      },
     ],
   },
   {
@@ -114,10 +187,32 @@ const SERVICES = [
     primary: "project",
     fields: [
       { name: "label", label: "Label", placeholder: "e.g. Security board" },
-      { name: "baseUrl", label: "Base URL", type: "url", placeholder: "https://your-org.atlassian.net", required: true },
-      { name: "project", label: "Project Key", placeholder: "SEC", required: true },
-      { name: "email", label: "Account Email", type: "email", placeholder: "you@company.com", required: true },
-      { name: "apiToken", label: "API Token", placeholder: "••••••••", required: true },
+      {
+        name: "baseUrl",
+        label: "Base URL",
+        type: "url",
+        placeholder: "https://your-org.atlassian.net",
+        required: true,
+      },
+      {
+        name: "project",
+        label: "Project Key",
+        placeholder: "SEC",
+        required: true,
+      },
+      {
+        name: "email",
+        label: "Account Email",
+        type: "email",
+        placeholder: "you@company.com",
+        required: true,
+      },
+      {
+        name: "apiToken",
+        label: "API Token",
+        placeholder: "••••••••",
+        required: true,
+      },
     ],
   },
 ];
@@ -139,6 +234,206 @@ const unknownService = (id) => ({
   fields: [],
   unknown: true,
 });
+
+// ── sender account catalogue ──────────────────────────────────
+// These types match the backend ChannelAccount providers.
+
+const SENDER_SERVICES = [
+  {
+    id: "gmail",
+    label: "Gmail",
+    icon: "/gmail.png",
+    color: "#ea4335",
+    blurb: "Send emails from a Gmail account",
+    fields: [
+      {
+        name: "label",
+        label: "Sender Name",
+        placeholder: "e.g. Security Alerts",
+      },
+      {
+        name: "email",
+        label: "Gmail Address",
+        type: "email",
+        placeholder: "alerts@company.com",
+        required: true,
+      },
+      {
+        name: "password",
+        label: "App Password",
+        type: "password",
+        placeholder: "Enter Gmail app password",
+        required: true,
+      },
+    ],
+  },
+
+  {
+    id: "outlook365",
+    label: "Outlook 365",
+    icon: "📧",
+    color: "#0078d4",
+    blurb: "Send emails from Microsoft 365",
+    fields: [
+      {
+        name: "label",
+        label: "Sender Name",
+        placeholder: "e.g. Microsoft Alerts",
+      },
+      {
+        name: "email",
+        label: "Outlook Email",
+        type: "email",
+        placeholder: "alerts@company.com",
+        required: true,
+      },
+      {
+        name: "password",
+        label: "Password",
+        type: "password",
+        placeholder: "Enter password",
+        required: true,
+      },
+    ],
+  },
+
+  {
+    id: "telegram",
+    label: "Telegram",
+    icon: "/telegram.png",
+    color: "#229ed9",
+    blurb: "Send messages using a Telegram bot",
+    fields: [
+      {
+        name: "label",
+        label: "Sender Name",
+        placeholder: "e.g. Security Bot",
+      },
+      {
+        name: "bot_token",
+        label: "Bot Token",
+        type: "password",
+        placeholder: "123456:ABC-DEF…",
+        required: true,
+      },
+    ],
+  },
+
+  {
+    id: "whatsapp",
+    label: "WhatsApp",
+    icon: "/whatsapp.png",
+    color: "#25d366",
+    blurb: "Send WhatsApp messages through Twilio",
+    fields: [
+      {
+        name: "label",
+        label: "Sender Name",
+        placeholder: "e.g. WhatsApp Alerts",
+      },
+      {
+        name: "account_sid",
+        label: "Twilio Account SID",
+        placeholder: "ACxxxxxxxxxxxxxxxx",
+        required: true,
+      },
+      {
+        name: "auth_token",
+        label: "Twilio Auth Token",
+        type: "password",
+        placeholder: "Enter auth token",
+        required: true,
+      },
+      {
+        name: "from_number",
+        label: "From Number",
+        type: "tel",
+        placeholder: "+14155552671",
+        required: true,
+      },
+    ],
+  },
+
+  {
+    id: "sms",
+    label: "SMS",
+    icon: "/sms.png",
+    color: "#0891b2",
+    blurb: "Send SMS messages through Twilio",
+    fields: [
+      {
+        name: "label",
+        label: "Sender Name",
+        placeholder: "e.g. SMS Alerts",
+      },
+      {
+        name: "account_sid",
+        label: "Twilio Account SID",
+        placeholder: "ACxxxxxxxxxxxxxxxx",
+        required: true,
+      },
+      {
+        name: "auth_token",
+        label: "Twilio Auth Token",
+        type: "password",
+        placeholder: "Enter auth token",
+        required: true,
+      },
+      {
+        name: "from_number",
+        label: "From Number",
+        type: "tel",
+        placeholder: "+14155552671",
+        required: true,
+      },
+    ],
+  },
+
+  {
+    id: "jira",
+    label: "Jira",
+    icon: "/jira.png",
+    color: "#0052cc",
+    blurb: "Create Jira issues from this account",
+    fields: [
+      {
+        name: "label",
+        label: "Sender Name",
+        placeholder: "e.g. Security Jira",
+      },
+      {
+        name: "base_url",
+        label: "Base URL",
+        type: "url",
+        placeholder: "https://your-org.atlassian.net",
+        required: true,
+      },
+      {
+        name: "email",
+        label: "Account Email",
+        type: "email",
+        placeholder: "you@company.com",
+        required: true,
+      },
+      {
+        name: "api_token",
+        label: "API Token",
+        type: "password",
+        placeholder: "Enter API token",
+        required: true,
+      },
+      {
+        name: "project_key",
+        label: "Project Key",
+        placeholder: "SEC",
+        required: true,
+      },
+    ],
+  },
+];
+
+const senderServiceById = (id) =>
+  SENDER_SERVICES.find((service) => service.id === id);
 
 const serviceFor = (type) => serviceById(type) || unknownService(type);
 
@@ -184,7 +479,8 @@ function unpackValue(service, name, value) {
     const parsed = JSON.parse(value);
     // Only an object is a packed field set; a bare number or string that happens
     // to be valid JSON (a phone number, say) is the destination itself.
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) fields = parsed;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+      fields = parsed;
   } catch {
     // not packed — value is the destination
   }
@@ -208,9 +504,12 @@ function validateField(field, value) {
   const v = (value || "").trim();
   if (field.required && !v) return `${field.label} is required`;
   if (!v) return null;
-  if (field.type === "email" && !EMAIL_RE.test(v)) return "Enter a valid email address";
-  if (field.type === "tel" && v.replace(/\D/g, "").length < 8) return "Enter a valid phone number";
-  if (field.type === "url" && !/^https?:\/\/.+/i.test(v)) return "Enter a valid URL (https://…)";
+  if (field.type === "email" && !EMAIL_RE.test(v))
+    return "Enter a valid email address";
+  if (field.type === "tel" && v.replace(/\D/g, "").length < 8)
+    return "Enter a valid phone number";
+  if (field.type === "url" && !/^https?:\/\/.+/i.test(v))
+    return "Enter a valid URL (https://…)";
   return null;
 }
 
@@ -227,6 +526,22 @@ export default function ChannelsManager() {
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState(null);
   const [filter, setFilter] = useState("all");
+
+  // ── sender accounts ────────────────────────────────────────────
+  const [senderAccounts, setSenderAccounts] = useState([]);
+  const [senderLoading, setSenderLoading] = useState(false);
+  const [senderLoadError, setSenderLoadError] = useState(null);
+
+  const [senderModalOpen, setSenderModalOpen] = useState(false);
+  const [senderListOpen, setSenderListOpen] = useState(false);
+
+  const [senderFilter, setSenderFilter] = useState("all");
+
+  const [senderServiceId, setSenderServiceId] = useState(null);
+  const [senderValues, setSenderValues] = useState({});
+  const [senderErrors, setSenderErrors] = useState({});
+  const [senderSaving, setSenderSaving] = useState(false);
+  const [removingSenderId, setRemovingSenderId] = useState(null);
 
   const load = useCallback(async (signal) => {
     setLoading(true);
@@ -254,6 +569,20 @@ export default function ChannelsManager() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  const loadSenderAccounts = useCallback(async () => {
+    setSenderLoading(true);
+    setSenderLoadError(null);
+
+    try {
+      const list = await fetchChannelAccounts();
+      setSenderAccounts(list || []);
+    } catch (err) {
+      setSenderLoadError(err?.message || "Could not load sender accounts.");
+    } finally {
+      setSenderLoading(false);
+    }
+  }, []);
+
   const service = serviceId ? serviceById(serviceId) : null;
 
   const counts = useMemo(() => {
@@ -262,8 +591,13 @@ export default function ChannelsManager() {
     return map;
   }, [channels]);
 
+
+
   const visible = useMemo(
-    () => (filter === "all" ? channels : channels.filter((c) => c.serviceId === filter)),
+    () =>
+      filter === "all"
+        ? channels
+        : channels.filter((c) => c.serviceId === filter),
     [channels, filter],
   );
 
@@ -273,6 +607,35 @@ export default function ChannelsManager() {
     () => Object.keys(counts).map(serviceFor),
     [counts],
   );
+
+  const senderCounts = useMemo(() => {
+  const map = {};
+
+  for (const account of senderAccounts) {
+    map[account.channel_type] =
+      (map[account.channel_type] || 0) + 1;
+  }
+
+  return map;
+}, [senderAccounts]);
+
+const senderVisible = useMemo(
+  () =>
+    senderFilter === "all"
+      ? senderAccounts
+      : senderAccounts.filter(
+          (account) => account.channel_type === senderFilter
+        ),
+  [senderAccounts, senderFilter]
+);
+
+const presentSenderServices = useMemo(
+  () =>
+    Object.keys(senderCounts)
+      .map((id) => senderServiceById(id))
+      .filter(Boolean),
+  [senderCounts]
+);
 
   // ── modal controls ──────────────────────────────────────────────
   const openAdd = () => {
@@ -298,6 +661,51 @@ export default function ChannelsManager() {
     setErrors({});
   };
 
+  const openAddSender = () => {
+    setSenderServiceId(null);
+    setSenderValues({});
+    setSenderErrors({});
+    setSenderModalOpen(true);
+  };
+
+  const openSenderList = async () => {
+    setSenderFilter("all");
+    setSenderListOpen(true);
+    await loadSenderAccounts();
+  };
+
+  const closeSenderModal = () => {
+    if (senderSaving) return;
+
+    setSenderModalOpen(false);
+    setSenderServiceId(null);
+    setSenderValues({});
+    setSenderErrors({});
+  };
+
+  const closeSenderList = () => {
+    if (removingSenderId) return;
+    setSenderListOpen(false);
+  };
+
+  const pickSenderService = (id) => {
+    setSenderServiceId(id);
+    setSenderValues({});
+    setSenderErrors({});
+  };
+
+  const setSenderField = (name, value) => {
+    setSenderValues((current) => ({
+      ...current,
+      [name]: value,
+    }));
+
+    setSenderErrors((current) => ({
+      ...current,
+      [name]: undefined,
+    }));
+  };
+
   const setField = (name, val) => {
     setValues((v) => ({ ...v, [name]: val }));
     setErrors((e) => ({ ...e, [name]: undefined }));
@@ -319,7 +727,8 @@ export default function ChannelsManager() {
     }
 
     const clean = {};
-    for (const f of service.fields) clean[f.name] = (values[f.name] || "").trim();
+    for (const f of service.fields)
+      clean[f.name] = (values[f.name] || "").trim();
 
     // The API's `name` must be unique across every channel. The label is what
     // the user meant to call it; with no label, the destination itself is the
@@ -347,6 +756,97 @@ export default function ChannelsManager() {
     }
   };
 
+  const submitSender = async (e) => {
+    e.preventDefault();
+
+    const service = senderServiceById(senderServiceId);
+
+    if (!service || senderSaving) return;
+
+    const nextErrors = {};
+
+    for (const field of service.fields) {
+      const value = senderValues[field.name] || "";
+      const message = validateField(field, value);
+
+      if (message) {
+        nextErrors[field.name] = message;
+      }
+    }
+
+    if (Object.keys(nextErrors).length) {
+      setSenderErrors(nextErrors);
+      return;
+    }
+
+    const credentials = {};
+
+    for (const field of service.fields) {
+      if (field.name === "label") continue;
+
+      credentials[field.name] = (senderValues[field.name] || "").trim();
+    }
+
+    const label =
+      (senderValues.label || "").trim() || senderValues.email || service.label;
+
+    setSenderSaving(true);
+    setSenderErrors({});
+
+    try {
+      const created = await addChannelAccount({
+        label,
+        channel_type: service.id,
+        credentials,
+      });
+
+      setSenderAccounts((current) => [created, ...current]);
+
+      setToast(`${service.label} sender registered`);
+
+      setSenderModalOpen(false);
+      setSenderServiceId(null);
+      setSenderValues({});
+      setSenderErrors({});
+    } catch (err) {
+      setSenderErrors({
+        _form: err?.message || "Could not register this sender account.",
+      });
+    } finally {
+      setSenderSaving(false);
+    }
+  };
+  const copyToClipboard = async (value) => {
+    const text = String(value ?? "");
+
+    if (!text || text === "—") return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setToast("Copied to clipboard");
+    } catch {
+      const textarea = document.createElement("textarea");
+
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+
+      document.body.appendChild(textarea);
+
+      textarea.select();
+
+      try {
+        document.execCommand("copy");
+        setToast("Copied to clipboard");
+      } catch {
+        setToast("Could not copy to clipboard");
+      } finally {
+        document.body.removeChild(textarea);
+      }
+    }
+  };
+
   const removeChannel = async (channel) => {
     const s = serviceFor(channel.serviceId);
     const detail = channel.values[s.primary] || s.label;
@@ -364,6 +864,30 @@ export default function ChannelsManager() {
     }
   };
 
+  const removeSender = async (account) => {
+    const detail = account.identifier || account.label || account.channel_type;
+
+    if (!window.confirm(`Remove this sender account (${detail})?`)) {
+      return;
+    }
+
+    setRemovingSenderId(account.id);
+
+    try {
+      await deleteChannelAccount(account.id);
+
+      setSenderAccounts((current) =>
+        current.filter((item) => item.id !== account.id),
+      );
+
+      setToast("Sender account removed");
+    } catch (err) {
+      setToast(err?.message || "Could not remove sender account.");
+    } finally {
+      setRemovingSenderId(null);
+    }
+  };
+
   const titleFor = (channel, s) =>
     channel.values.label?.trim() || s?.label || "Channel";
   const primaryFor = (channel, s) => channel.values[s?.primary] || "—";
@@ -377,12 +901,42 @@ export default function ChannelsManager() {
         <div>
           <h1 className="ch-title">Message Channels</h1>
           <p className="ch-subtitle">
-            Register where notifications are delivered — add as many as you need.
+            Register where notifications are delivered — add as many as you
+            need.
           </p>
         </div>
-        <button className="ch-add-btn" onClick={openAdd}>
+        {/* <button className="ch-add-btn" onClick={openAdd}>
           <span className="ch-add-plus">+</span> Add Channel
-        </button>
+        </button> */}
+
+        <div className="ch-header-actions">
+          <button
+            className="ch-header-btn ch-header-btn--primary"
+            onClick={openAdd}
+          >
+            <span>+</span> Add Recipient
+          </button>
+
+          <button
+            className="ch-header-btn ch-header-btn--sender"
+            onClick={openAddSender}
+          >
+            <span>+</span> Add Sender
+          </button>
+
+          <button
+            className="ch-header-btn"
+            onClick={() => {
+              setFilter("all");
+            }}
+          >
+            Recipients
+          </button>
+
+          <button className="ch-header-btn" onClick={openSenderList}>
+            Senders
+          </button>
+        </div>
       </header>
 
       {/* ── stats strip ────────────────────────────────────── */}
@@ -466,9 +1020,16 @@ export default function ChannelsManager() {
           {visible.map((channel) => {
             const s = serviceFor(channel.serviceId);
             return (
-              <div className="ch-card" style={{ "--accent": s?.color }} key={channel.id}>
+              <div
+                className="ch-card"
+                style={{ "--accent": s?.color }}
+                key={channel.id}
+              >
                 <div className="ch-card-top">
-                  <span className="ch-badge" style={{ background: `${s?.color}18` }}>
+                  <span
+                    className="ch-badge"
+                    style={{ background: `${s?.color}18` }}
+                  >
                     {renderIcon(s?.icon, s?.label, "lg")}
                   </span>
                   <div className="ch-card-head">
@@ -488,9 +1049,26 @@ export default function ChannelsManager() {
                     </button>
                   </div>
                 </div>
-                <div className="ch-card-field">
+                {/* <div className="ch-card-field">
                   <span className="ch-card-field-label">{primaryLabelFor(s)}</span>
                   <span className="ch-card-primary">{primaryFor(channel, s)}</span>
+                </div> */}
+                <div className="ch-card-field">
+                  <span className="ch-card-field-label">
+                    {primaryLabelFor(s)}
+                  </span>
+
+                  <button
+                    type="button"
+                    className="ch-card-primary"
+                    data-full-value={primaryFor(channel, s)}
+                    // title={primaryFor(channel, s)}
+                    onClick={() => copyToClipboard(primaryFor(channel, s))}
+                  >
+                    <span className="ch-card-primary-text">
+                      {primaryFor(channel, s)}
+                    </span>
+                  </button>
                 </div>
                 <div className="ch-card-meta">
                   <span className="ch-status-pill">
@@ -511,7 +1089,9 @@ export default function ChannelsManager() {
               <>
                 <div className="ch-modal-head">
                   <h2>Add a channel</h2>
-                  <button className="ch-close" onClick={closeModal}>✕</button>
+                  <button className="ch-close" onClick={closeModal}>
+                    ✕
+                  </button>
                 </div>
                 <p className="ch-modal-sub">Choose a service to connect</p>
                 <div className="ch-service-grid">
@@ -521,7 +1101,10 @@ export default function ChannelsManager() {
                       className="ch-service-tile"
                       onClick={() => pickService(s.id)}
                     >
-                      <span className="ch-tile-icon" style={{ background: `${s.color}18` }}>
+                      <span
+                        className="ch-tile-icon"
+                        style={{ background: `${s.color}18` }}
+                      >
                         {renderIcon(s.icon, s.label, "lg")}
                       </span>
                       <span className="ch-tile-name">{s.label}</span>
@@ -536,15 +1119,24 @@ export default function ChannelsManager() {
               <>
                 <div className="ch-modal-head">
                   <div className="ch-modal-title">
-                    <button className="ch-back" onClick={() => setStep("choose")} title="Back">
+                    <button
+                      className="ch-back"
+                      onClick={() => setStep("choose")}
+                      title="Back"
+                    >
                       ‹
                     </button>
-                    <span className="ch-tile-icon sm" style={{ background: `${service.color}18` }}>
+                    <span
+                      className="ch-tile-icon sm"
+                      style={{ background: `${service.color}18` }}
+                    >
                       {renderIcon(service.icon, service.label, "md")}
                     </span>
                     <h2>New {service.label} channel</h2>
                   </div>
-                  <button className="ch-close" onClick={closeModal}>✕</button>
+                  <button className="ch-close" onClick={closeModal}>
+                    ✕
+                  </button>
                 </div>
 
                 <form className="ch-form" onSubmit={submit}>
@@ -556,16 +1148,24 @@ export default function ChannelsManager() {
                       </label>
                       <input
                         className={`ch-input ${errors[f.name] ? "err" : ""}`}
-                        type={f.type === "email" || f.type === "url" ? "text" : f.type || "text"}
+                        type={
+                          f.type === "email" || f.type === "url"
+                            ? "text"
+                            : f.type || "text"
+                        }
                         placeholder={f.placeholder}
                         value={values[f.name] || ""}
                         onChange={(e) => setField(f.name, e.target.value)}
                         autoComplete="off"
                       />
-                      {errors[f.name] && <span className="ch-err">{errors[f.name]}</span>}
+                      {errors[f.name] && (
+                        <span className="ch-err">{errors[f.name]}</span>
+                      )}
                     </div>
                   ))}
-                  {errors._form && <div className="ch-form-err">{errors._form}</div>}
+                  {errors._form && (
+                    <div className="ch-form-err">{errors._form}</div>
+                  )}
                   <div className="ch-form-actions">
                     <button
                       type="button"
@@ -575,12 +1175,385 @@ export default function ChannelsManager() {
                     >
                       Cancel
                     </button>
-                    <button type="submit" className="ch-btn primary" disabled={saving}>
+                    <button
+                      type="submit"
+                      className="ch-btn primary"
+                      disabled={saving}
+                    >
                       {saving ? "Registering…" : "Register channel"}
                     </button>
                   </div>
                 </form>
               </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {senderModalOpen && (
+        <div className="ch-modal-backdrop" onClick={closeSenderModal}>
+          <div className="ch-modal" onClick={(e) => e.stopPropagation()}>
+            {!senderServiceId ? (
+              <>
+                <div className="ch-modal-head">
+                  <h2>Add Sender Account</h2>
+
+                  <button className="ch-close" onClick={closeSenderModal}>
+                    ✕
+                  </button>
+                </div>
+
+                <p className="ch-modal-sub">
+                  Choose the account you want to use for sending notifications.
+                </p>
+
+                <div className="ch-service-grid">
+                  {SENDER_SERVICES.map((service) => (
+                    <button
+                      key={service.id}
+                      className="ch-service-tile"
+                      onClick={() => pickSenderService(service.id)}
+                    >
+                      <span
+                        className="ch-tile-icon"
+                        style={{
+                          background: `${service.color}18`,
+                        }}
+                      >
+                        {renderIcon(service.icon, service.label, "lg")}
+                      </span>
+
+                      <span className="ch-tile-name">{service.label}</span>
+
+                      <span className="ch-tile-blurb">{service.blurb}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="ch-modal-head">
+                  <div className="ch-modal-title">
+                    <button
+                      className="ch-back"
+                      onClick={() => setSenderServiceId(null)}
+                      title="Back"
+                    >
+                      ‹
+                    </button>
+
+                    <span
+                      className="ch-tile-icon sm"
+                      style={{
+                        background: `${
+                          senderServiceById(senderServiceId)?.color
+                        }18`,
+                      }}
+                    >
+                      {renderIcon(
+                        senderServiceById(senderServiceId)?.icon,
+                        senderServiceById(senderServiceId)?.label,
+                        "md",
+                      )}
+                    </span>
+
+                    <h2>
+                      Add {senderServiceById(senderServiceId)?.label} Sender
+                    </h2>
+                  </div>
+
+                  <button className="ch-close" onClick={closeSenderModal}>
+                    ✕
+                  </button>
+                </div>
+
+                <p className="ch-modal-sub">
+                  Enter the sender account details. The account will be verified
+                  before it is registered.
+                </p>
+
+                <form className="ch-form" onSubmit={submitSender}>
+                  {senderServiceById(senderServiceId)?.fields.map((field) => (
+                    <div className="ch-field" key={field.name}>
+                      <label className="ch-label">
+                        {field.label}
+                        {field.required && <span className="ch-req">*</span>}
+                      </label>
+
+                      <input
+                        className={`ch-input ${
+                          senderErrors[field.name] ? "err" : ""
+                        }`}
+                        type={field.type || "text"}
+                        placeholder={field.placeholder}
+                        value={senderValues[field.name] || ""}
+                        onChange={(e) =>
+                          setSenderField(field.name, e.target.value)
+                        }
+                        autoComplete="off"
+                      />
+
+                      {senderErrors[field.name] && (
+                        <span className="ch-err">
+                          {senderErrors[field.name]}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+
+                  {senderErrors._form && (
+                    <div className="ch-form-err">{senderErrors._form}</div>
+                  )}
+
+                  <div className="ch-form-actions">
+                    <button
+                      type="button"
+                      className="ch-btn ghost"
+                      onClick={closeSenderModal}
+                      disabled={senderSaving}
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="submit"
+                      className="ch-btn primary"
+                      disabled={senderSaving}
+                    >
+                      {senderSaving
+                        ? "Verifying & Registering…"
+                        : "Register Sender"}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {senderListOpen && (
+        <div className="ch-modal-backdrop" onClick={closeSenderList}>
+          <div
+            className="ch-modal ch-modal--wide"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="ch-modal-head">
+              <div>
+               <h2>Senders</h2>
+
+<p className="ch-modal-sub">
+  Manage sender accounts used for sending notifications and reports.
+</p>
+              </div>
+
+              <button className="ch-close" onClick={closeSenderList}>
+                ✕
+              </button>
+            </div>
+
+            {senderLoading ? (
+              <div className="ch-empty ch-empty--modal">
+                <div className="ch-empty-icon">⏳</div>
+                <h2>Loading sender accounts…</h2>
+              </div>
+            ) : senderLoadError ? (
+              <div className="ch-empty ch-empty--modal">
+                <div className="ch-empty-icon">⚠️</div>
+                <h2>Could not load senders</h2>
+
+                <p>{senderLoadError}</p>
+
+                <button className="ch-add-btn big" onClick={loadSenderAccounts}>
+                  Retry
+                </button>
+              </div>
+            ) : senderAccounts.length === 0 ? (
+              <div className="ch-empty ch-empty--modal">
+                <div className="ch-empty-icon">📤</div>
+
+                <h2>No sender accounts yet</h2>
+
+                <p>
+                  Add a sender account to send reports through communication
+                  channels.
+                </p>
+
+                <button
+                  className="ch-add-btn big"
+                  onClick={() => {
+                    closeSenderList();
+                    openAddSender();
+                  }}
+                >
+                  <span className="ch-add-plus">+</span>
+                  Add Sender
+                </button>
+              </div>
+            ) : (
+  <>
+    <div className="ch-stats">
+      <div className="ch-stat">
+        <span className="ch-stat-num">
+          {senderAccounts.length}
+        </span>
+
+        <span className="ch-stat-label">
+          Sender{senderAccounts.length === 1 ? "" : "s"}
+        </span>
+      </div>
+
+      <div className="ch-stat-divider" />
+
+      <div className="ch-stat">
+        <span className="ch-stat-num">
+          {Object.keys(senderCounts).length}
+        </span>
+
+        <span className="ch-stat-label">
+          Services connected
+        </span>
+      </div>
+
+      <div className="ch-stat-services">
+        {presentSenderServices.map((service) => (
+          <span
+            key={service.id}
+            className="ch-stat-chip"
+            style={{
+              background: `${service.color}14`,
+            }}
+            title={`${service.label}: ${senderCounts[service.id]}`}
+          >
+            {renderIcon(
+              service.icon,
+              service.label,
+              "xs"
+            )}
+          </span>
+        ))}
+      </div>
+    </div>
+
+    <div className="ch-filters">
+      <button
+        className={`ch-filter ${
+          senderFilter === "all" ? "on" : ""
+        }`}
+        onClick={() => setSenderFilter("all")}
+      >
+        All
+        <span className="ch-filter-n">
+          {senderAccounts.length}
+        </span>
+      </button>
+
+      {presentSenderServices.map((service) => (
+        <button
+          key={service.id}
+          className={`ch-filter ${
+            senderFilter === service.id ? "on" : ""
+          }`}
+          onClick={() => setSenderFilter(service.id)}
+        >
+          {renderIcon(
+            service.icon,
+            service.label,
+            "xs"
+          )}
+
+          <span className="ch-filter-label">
+            {service.label}
+          </span>
+
+          <span className="ch-filter-n">
+            {senderCounts[service.id]}
+          </span>
+        </button>
+      ))}
+    </div>
+
+    <div className="ch-sender-grid">
+                {senderVisible.map((account) => {
+                  const service = senderServiceById(account.channel_type);
+
+                  return (
+                    <div className="ch-sender-card" key={account.id}>
+                      <div className="ch-card-top">
+                        <span
+                          className="ch-badge"
+                          style={{
+                            background: `${service?.color || "#4f46e5"}18`,
+                          }}
+                        >
+                          {renderIcon(
+                            service?.icon || "📤",
+                            service?.label || account.channel_type,
+                            "lg",
+                          )}
+                        </span>
+
+                        <div className="ch-card-head">
+                          <div className="ch-card-name">{account.label}</div>
+
+                          <div className="ch-card-service">
+                            {service?.label || account.channel_type}
+                          </div>
+                        </div>
+
+                        <div className="ch-card-actions">
+                          <button
+                            className="ch-icon-btn danger"
+                            title="Remove sender"
+                            onClick={() => removeSender(account)}
+                            disabled={removingSenderId === account.id}
+                          >
+                            {removingSenderId === account.id ? "…" : "🗑️"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* <div className="ch-card-field">
+
+                  <span className="ch-card-field-label">
+                    Sender
+                  </span>
+
+                  <span className="ch-card-primary">
+                    {account.identifier || "—"}
+                  </span>
+
+                </div> */}
+                      <div className="ch-card-field">
+                        <span className="ch-card-field-label">Sender</span>
+
+                        <button
+                          type="button"
+                          className="ch-card-primary"
+                          data-full-value={account.identifier || "—"}
+                          // title={account.identifier || "—"}
+                          onClick={() => copyToClipboard(account.identifier)}
+                        >
+                          <span className="ch-card-primary-text">
+                            {account.identifier || "—"}
+                          </span>
+                        </button>
+                      </div>
+
+                      <div className="ch-card-meta">
+                        <span className="ch-status-pill">
+                          <span className="ch-dot" />
+
+                          {account.is_active && account.is_verified
+                            ? "Verified & Active"
+                            : "Inactive"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+               </div>
+            </>
             )}
           </div>
         </div>

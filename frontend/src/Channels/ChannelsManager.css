@@ -58,6 +58,64 @@
   box-shadow: 0 6px 18px rgba(79, 70, 229, 0.32);
   transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
 }
+
+/* ── header actions ───────────────────────────────────────── */
+
+.ch-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.ch-header-btn {
+  height: 42px;
+  padding: 0 16px;
+  border: 1px solid #e2ded7;
+  border-radius: 11px;
+  background: #fff;
+  color: #4b4740;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.ch-header-btn:hover {
+  background: #f7f5f1;
+  border-color: #cfc9bf;
+  transform: translateY(-1px);
+}
+
+.ch-header-btn--primary {
+  border-color: transparent;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.28);
+}
+
+.ch-header-btn--primary:hover {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+}
+
+.ch-header-btn--sender {
+  border-color: #d8d5ff;
+  background: #f5f4ff;
+  color: #4f46e5;
+}
+
+.ch-header-btn--sender:hover {
+  background: #eeecff;
+  border-color: #c7c3ff;
+}
+
+
 .ch-add-btn:hover {
   filter: brightness(1.05);
   transform: translateY(-1px);
@@ -199,13 +257,19 @@
 }
 .ch-card {
   position: relative;
+  height: 190px;
+min-height: 190px;
+box-sizing: border-box;
+display: flex;
+flex-direction: column;
   background: #fff;
   border: 0.5px solid #e9e5dd;
   border-radius: 16px;
   padding: 18px;
-  overflow: hidden;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   transition: box-shadow 0.18s ease, transform 0.12s ease, border-color 0.18s ease;
+  overflow: visible;
+
 }
 .ch-card::before {
   content: "";
@@ -216,6 +280,7 @@
   opacity: 0.9;
 }
 .ch-card:hover {
+  z-index: 1000;
   transform: translateY(-3px);
   /* fallbacks for browsers without color-mix */
   border-color: #d7d2c8;
@@ -285,6 +350,7 @@
 
 .ch-card-field {
   margin-top: 15px;
+  min-width: 0;
 }
 .ch-card-field-label {
   display: block;
@@ -295,7 +361,7 @@
   color: #b0a99e;
   margin-bottom: 5px;
 }
-.ch-card-primary {
+/* .ch-card-primary {
   display: block;
   font-size: 13.5px;
   color: #33302a;
@@ -305,6 +371,111 @@
   border-radius: 9px;
   padding: 10px 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+} */
+
+.ch-card-primary {
+  position: relative;
+
+  display: flex;
+  align-items: center;
+
+  width: 100%;
+  height: 40px;
+  min-width: 0;
+  box-sizing: border-box;
+
+  font-size: 13.5px;
+  color: #33302a;
+  text-align: left;
+
+  background: #faf9f6;
+  border: 0.5px solid #ece8e0;
+  border-radius: 9px;
+
+  padding: 0 12px;
+
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  cursor: copy;
+  overflow: visible;
+}
+
+.ch-card-primary:hover {
+  background: #f5f3ee;
+  border-color: #d9d4ca;
+}
+
+.ch-card-primary:focus-visible {
+  outline: 2px solid rgba(79, 70, 229, 0.35);
+  outline-offset: 2px;
+}
+
+.ch-card-primary-text {
+  display: block;
+
+  width: 100%;
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ch-card-primary::after {
+  content: attr(data-full-value);
+
+  position: absolute;
+
+  left: 0;
+  top: calc(100% + 7px);
+
+  z-index: 50;
+
+  width: max-content;
+  max-width: min(520px, calc(100vw - 40px));
+
+  box-sizing: border-box;
+
+  padding: 9px 11px;
+
+  border: 1px solid #ded9d0;
+  border-radius: 8px;
+
+  /* background: #1f1d19;
+  color: #fff; */
+
+  background: #fff;
+color: #33302a;
+
+z-index: 99999;
+
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+
+  white-space: normal;
+  overflow-wrap: anywhere;
+
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+
+  transform: translateY(-3px);
+
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease,
+    visibility 0.12s ease;
+}
+
+.ch-card-primary:hover::after,
+.ch-card-primary:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 .ch-card-meta {
   display: flex;
@@ -438,7 +609,10 @@
 }
 .ch-back:hover {
   background: #f2f0ec;
+
 }
+
+
 
 /* service picker grid */
 .ch-service-grid {
@@ -542,6 +716,70 @@
   font-size: 12px;
   color: #c5221f;
 }
+
+/* ── sender cards ─────────────────────────────────────────── */
+
+.ch-sender-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(auto-fill, minmax(270px, 1fr));
+
+  gap: 18px;
+}
+
+.ch-sender-card {
+  position: relative;
+   height: 190px;
+  min-height: 190px;
+  box-sizing: border-box;
+
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 0.5px solid #e9e5dd;
+  border-radius: 16px;
+  padding: 18px;
+  overflow: visible;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.12s ease,
+    border-color 0.18s ease;
+}
+
+.ch-sender-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: #4f46e5;
+}
+
+.ch-sender-card:hover {
+  transform: translateY(-3px);
+  border-color: #d7d2c8;
+  box-shadow: 0 14px 34px rgba(20, 19, 15, 0.12);
+}
+
+/* .ch-modal--wide {
+  max-width: 900px;
+} */
+
+.ch-modal--wide {
+  width: 100%;
+  max-width: 1320px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.ch-empty--modal {
+  max-width: none;
+  margin: 30px 0 0;
+}
+
+
 /* Whatever the server said when it refused the channel — a duplicate name,
    a missing admin role — shown above the buttons rather than under a field. */
 .ch-form-err {
@@ -619,4 +857,13 @@
     margin-left: 0;
     width: 100%;
   }
+
+  .ch-header-actions {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.ch-header-btn {
+  flex: 1 1 auto;
+}
 }

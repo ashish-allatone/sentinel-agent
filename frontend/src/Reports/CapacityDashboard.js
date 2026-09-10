@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Area,
@@ -27,11 +33,18 @@ import { CHART_CHROME, GAP_COLOR, SERIES_COLORS } from "./colors";
 import { istInputToApi, lastHoursInputs } from "./timeRange";
 import "./CapacityDashboard.css";
 
+// import {
+//   fetchChannels,
+//   fetchChannelReadiness,
+//   sendCommunication,
+// } from "../Channels/channelsApi";
+
+import { fetchChannels } from "../Channels/channelsApi";
+
 import {
-  fetchChannels,
-  fetchChannelReadiness,
-  sendCommunication,
-} from "../Channels/channelsApi";
+  fetchChannelAccounts,
+  sendFileViaChannelAccount,
+} from "../Channels/channelAccountsApi";
 
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
@@ -175,7 +188,9 @@ function formatValue(value, unit) {
   if (!Number.isFinite(n)) return "—";
   const abs = Math.abs(n);
   const decimals = abs >= 10 ? 1 : abs >= 1 ? 2 : 3;
-  return unit === "%" ? `${n.toFixed(decimals)}%` : `${n.toFixed(decimals)} ${unit}`;
+  return unit === "%"
+    ? `${n.toFixed(decimals)}%`
+    : `${n.toFixed(decimals)} ${unit}`;
 }
 
 /** Axis ticks: same magnitude rule, without the unit suffix. */
@@ -207,9 +222,24 @@ const PRINT_H = 520;
 const STATS = [
   { key: "avg_cpu_percent", label: "Avg CPU", unit: "%", modifier: "cpu" },
   { key: "avg_memory", label: "Avg memory", unit: "MB", modifier: "mem" },
-  { key: "avg_agent_cpu_percent", label: "Avg Agent CPU", unit: "%", modifier: "acpu" },
-  { key: "avg_agent_memory", label: "Avg Agent memory", unit: "Mb", modifier: "amem" },
-  { key: "avg_bandwidth_mbps", label: "Avg Bandwidth", unit: "Mbps", modifier: "bw" },
+  {
+    key: "avg_agent_cpu_percent",
+    label: "Avg Agent CPU",
+    unit: "%",
+    modifier: "acpu",
+  },
+  {
+    key: "avg_agent_memory",
+    label: "Avg Agent memory",
+    unit: "Mb",
+    modifier: "amem",
+  },
+  {
+    key: "avg_bandwidth_mbps",
+    label: "Avg Bandwidth",
+    unit: "Mbps",
+    modifier: "bw",
+  },
 ];
 
 // ── range helpers ──────────────────────────────────────────────
@@ -225,7 +255,11 @@ function clampRange(start, end, lastIndex) {
 /** Zoom a window about its own centre by `factor` (<1 in, >1 out). */
 function zoomAround([start, end], factor, lastIndex) {
   const centre = (start + end) / 2;
-  return clampRange(centre - (centre - start) * factor, centre + (end - centre) * factor, lastIndex);
+  return clampRange(
+    centre - (centre - start) * factor,
+    centre + (end - centre) * factor,
+    lastIndex,
+  );
 }
 
 const fullRange = (lastIndex) => [0, Math.max(0, lastIndex)];
@@ -241,7 +275,10 @@ function initialTheme() {
     /* storage can be blocked; fall through to the OS preference */
   }
   try {
-    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
+    if (
+      window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: light)").matches
+    ) {
       return "light";
     }
   } catch (_) {
@@ -285,11 +322,16 @@ function useZoomPan({ range, setRange, lastIndex }) {
       const [start, end] = rangeRef.current;
       // The sample under the pointer has to stay under the pointer, so zoom
       // about that index rather than the middle of the pane.
-      const anchor = start + clamp01((event.clientX - left) / width) * (end - start);
+      const anchor =
+        start + clamp01((event.clientX - left) / width) * (end - start);
       const factor = event.deltaY < 0 ? ZOOM_IN : ZOOM_OUT;
 
       setRange(
-        clampRange(anchor - (anchor - start) * factor, anchor + (end - anchor) * factor, lastIndex)
+        clampRange(
+          anchor - (anchor - start) * factor,
+          anchor + (end - anchor) * factor,
+          lastIndex,
+        ),
       );
     };
 
@@ -312,7 +354,11 @@ function useZoomPan({ range, setRange, lastIndex }) {
       dragRef.current = { mode: "box", x0: x };
       setSelection({ x0: x, x1: x });
     } else {
-      dragRef.current = { mode: "pan", startX: event.clientX, range: rangeRef.current };
+      dragRef.current = {
+        mode: "pan",
+        startX: event.clientX,
+        range: rangeRef.current,
+      };
     }
   };
 
@@ -323,11 +369,14 @@ function useZoomPan({ range, setRange, lastIndex }) {
 
     if (drag.mode === "pan") {
       const [start, end] = drag.range;
-      const deltaIndex = ((event.clientX - drag.startX) / width) * (end - start);
+      const deltaIndex =
+        ((event.clientX - drag.startX) / width) * (end - start);
       setRange(clampRange(start - deltaIndex, end - deltaIndex, lastIndex));
     } else {
       const x = event.clientX - rect.left;
-      setSelection((current) => (current ? { x0: current.x0, x1: x } : current));
+      setSelection((current) =>
+        current ? { x0: current.x0, x1: x } : current,
+      );
     }
   };
 
@@ -350,7 +399,8 @@ function useZoomPan({ range, setRange, lastIndex }) {
     if (x1 - x0 < MIN_BOX_PX) return;
 
     const [start, end] = rangeRef.current;
-    const toIndex = (px) => start + clamp01((px + rect.left - left) / width) * (end - start);
+    const toIndex = (px) =>
+      start + clamp01((px + rect.left - left) / width) * (end - start);
     const nextStart = toIndex(x0);
     const nextEnd = toIndex(x1);
     if (nextEnd - nextStart < MIN_SPAN) return;
@@ -399,7 +449,9 @@ function CapacityTooltip({ active, payload, lines, unit }) {
 
   return (
     <div className="capacity-dash__tooltip">
-      <div className="capacity-dash__tooltip-time">{formatFull(row.ms)} IST</div>
+      <div className="capacity-dash__tooltip-time">
+        {formatFull(row.ms)} IST
+      </div>
       {lines.map((line) => {
         const value = row[line.key];
         return (
@@ -431,7 +483,18 @@ function CapacityTooltip({ active, payload, lines, unit }) {
  * No syncId: each pane now zooms to its own window, so a shared crosshair would
  * point at a different sample in every pane. Hover is per-pane, like the zoom.
  */
-function ChartBody({ lines, data, rows, gaps, start, end, theme, height, width, unit }) {
+function ChartBody({
+  lines,
+  data,
+  rows,
+  gaps,
+  start,
+  end,
+  theme,
+  height,
+  width,
+  unit,
+}) {
   const chrome = CHART_CHROME[theme];
   const gapColor = GAP_COLOR[theme];
   const print = width != null;
@@ -443,7 +506,11 @@ function ChartBody({ lines, data, rows, gaps, start, end, theme, height, width, 
       width={width}
       height={print ? height : undefined}
     >
-      <CartesianGrid stroke={chrome.grid} strokeDasharray="0" vertical={false} />
+      <CartesianGrid
+        stroke={chrome.grid}
+        strokeDasharray="0"
+        vertical={false}
+      />
       <XAxis
         dataKey="i"
         type="number"
@@ -455,10 +522,10 @@ function ChartBody({ lines, data, rows, gaps, start, end, theme, height, width, 
         stroke={chrome.axis}
         // tick={{ fill: chrome.tick, fontSize: 10 }}
         tick={{
-  fill: chrome.tick,
-  fontSize: print ? 13 : 10,
-  fontWeight: print ? 600 : 400,
-}}
+          fill: chrome.tick,
+          fontSize: print ? 13 : 10,
+          fontWeight: print ? 600 : 400,
+        }}
       />
       <YAxis
         width={Y_AXIS_WIDTH}
@@ -466,10 +533,10 @@ function ChartBody({ lines, data, rows, gaps, start, end, theme, height, width, 
         stroke={chrome.axis}
         // tick={{ fill: chrome.tick, fontSize: 10 }}
         tick={{
-  fill: chrome.tick,
-  fontSize: print ? 13 : 10,
-  fontWeight: print ? 600 : 400,
-}}
+          fill: chrome.tick,
+          fontSize: print ? 13 : 10,
+          fontWeight: print ? 600 : 400,
+        }}
         tickFormatter={formatTick}
       />
       {!print && (
@@ -479,22 +546,23 @@ function ChartBody({ lines, data, rows, gaps, start, end, theme, height, width, 
           isAnimationActive={false}
         />
       )}
-      {false && gaps.map((gap) => (
-        <ReferenceLine
-          key={gap.at}
-          x={gap.at}
-          stroke={gapColor}
-          strokeDasharray="4 3"
-          strokeWidth={1.5}
-          label={{
-            value: `no data · ${formatDuration(gap.ms)}`,
-            position: "insideTop",
-            fill: gapColor,
-            fontSize: 11,
-            fontWeight: 600,
-          }}
-        />
-      ))}
+      {false &&
+        gaps.map((gap) => (
+          <ReferenceLine
+            key={gap.at}
+            x={gap.at}
+            stroke={gapColor}
+            strokeDasharray="4 3"
+            strokeWidth={1.5}
+            label={{
+              value: `no data · ${formatDuration(gap.ms)}`,
+              position: "insideTop",
+              fill: gapColor,
+              fontSize: 11,
+              fontWeight: 600,
+            }}
+          />
+        ))}
       {lines.map((line) => (
         <Line
           key={line.key}
@@ -571,7 +639,17 @@ function PaneHeader({ pane, lines, hidden, onToggle }) {
 // the Full range strip and its buttons; the pane adopts it whenever it changes,
 // but zooming THIS pane (wheel, drag, box, its own buttons) only touches local
 // state — so the graphs zoom independently, and Full range still moves them all.
-function ChartPane({ pane, rows, masterRange, gaps, lastIndex, hidden, onToggle, loading, theme }) {
+function ChartPane({
+  pane,
+  rows,
+  masterRange,
+  gaps,
+  lastIndex,
+  hidden,
+  onToggle,
+  loading,
+  theme,
+}) {
   const [range, setRange] = useState(masterRange);
 
   // Adopt the shared window when it changes (Full range brush / global buttons /
@@ -581,17 +659,24 @@ function ChartPane({ pane, rows, masterRange, gaps, lastIndex, hidden, onToggle,
     setRange(masterRange);
   }, [masterRange]);
 
-  const { containerRef, selection, handlers } = useZoomPan({ range, setRange, lastIndex });
+  const { containerRef, selection, handlers } = useZoomPan({
+    range,
+    setRange,
+    lastIndex,
+  });
 
   const [start, end] = range;
   // Slicing is what makes the Y axis rescale to the window instead of the whole run.
   const visible = useMemo(() => rows.slice(start, end + 1), [rows, start, end]);
   const visibleGaps = useMemo(
     () => gaps.filter((gap) => gap.at > start && gap.at < end),
-    [gaps, start, end]
+    [gaps, start, end],
   );
 
-  const painted = useMemo(() => paintLines(pane.lines, theme), [pane.lines, theme]);
+  const painted = useMemo(
+    () => paintLines(pane.lines, theme),
+    [pane.lines, theme],
+  );
   const shown = painted.filter((line) => !hidden[line.key]);
 
   const windowed = start > 0 || end < lastIndex;
@@ -600,11 +685,18 @@ function ChartPane({ pane, rows, masterRange, gaps, lastIndex, hidden, onToggle,
 
   return (
     <section className="capacity-dash__pane">
-      <PaneHeader pane={pane} lines={painted} hidden={hidden} onToggle={onToggle} />
+      <PaneHeader
+        pane={pane}
+        lines={painted}
+        hidden={hidden}
+        onToggle={onToggle}
+      />
 
       <div className="capacity-dash__pane-tools">
         <span className="capacity-dash__pane-window">
-          {windowed ? `${formatClock(from)}–${formatClock(to)} · ${end - start + 1} pts` : "full range"}
+          {windowed
+            ? `${formatClock(from)}–${formatClock(to)} · ${end - start + 1} pts`
+            : "full range"}
         </span>
         <div className="capacity-dash__pane-btns">
           <button
@@ -815,34 +907,25 @@ function PrintReport({ payload, rows, gaps, stats, periodText, theme }) {
 
   return (
     <div className="capacity-dash__print" aria-hidden="true">
-
       {/* =======================================================
           PAGE 01 — COVER / EXECUTIVE OVERVIEW
           ======================================================= */}
       <section className="capacity-dash__print-page capacity-dash__print-cover">
-
         <div className="capacity-dash__print-cover-top">
           <div>
-            <div className="capacity-dash__print-logo">
-              GUARDLYNX
-            </div>
+            <div className="capacity-dash__print-logo">GUARDLYNX</div>
 
             <div className="capacity-dash__print-logo-sub">
               Security &amp; Compliance Monitoring
             </div>
           </div>
 
-          <div className="capacity-dash__print-confidential">
-            CONFIDENTIAL
-          </div>
+          <div className="capacity-dash__print-confidential">CONFIDENTIAL</div>
         </div>
-
 
         <div className="capacity-dash__print-cover-rule" />
 
-
         <div className="capacity-dash__print-cover-content">
-
           <div className="capacity-dash__print-eyebrow">
             CAPACITY MONITORING
           </div>
@@ -854,23 +937,18 @@ function PrintReport({ payload, rows, gaps, stats, periodText, theme }) {
           </h1>
 
           <p className="capacity-dash__print-cover-lead">
-            A consolidated view of host and Guardlynx agent resource
-            utilization across the selected reporting window.
+            A consolidated view of host and Guardlynx agent resource utilization
+            across the selected reporting window.
           </p>
 
-
           <div className="capacity-dash__print-meta-grid">
-
             <div className="capacity-dash__print-meta-card">
-              <div className="capacity-dash__print-meta-label">
-                Agent
-              </div>
+              <div className="capacity-dash__print-meta-label">Agent</div>
 
               <div className="capacity-dash__print-meta-value">
                 {payload ? payload.agent_name : "—"}
               </div>
             </div>
-
 
             <div className="capacity-dash__print-meta-card">
               <div className="capacity-dash__print-meta-label">
@@ -882,35 +960,26 @@ function PrintReport({ payload, rows, gaps, stats, periodText, theme }) {
               </div>
             </div>
 
-
             <div className="capacity-dash__print-meta-card">
-              <div className="capacity-dash__print-meta-label">
-                Generated
-              </div>
+              <div className="capacity-dash__print-meta-label">Generated</div>
 
               <div className="capacity-dash__print-meta-value capacity-dash__print-meta-value--small">
                 {generatedAt} IST
               </div>
             </div>
 
-
             <div className="capacity-dash__print-meta-card">
-              <div className="capacity-dash__print-meta-label">
-                Samples
-              </div>
+              <div className="capacity-dash__print-meta-label">Samples</div>
 
               <div className="capacity-dash__print-meta-value">
                 {sampleCount}
               </div>
             </div>
-
           </div>
-
 
           {/* <div className="capacity-dash__print-section-label">
             KEY METRICS
           </div> */}
-
 
           {/* <div className="capacity-dash__print-kpis">
 
@@ -939,7 +1008,6 @@ function PrintReport({ payload, rows, gaps, stats, periodText, theme }) {
 
           </div> */}
 
-
           {/* <div className="capacity-dash__print-summary-note">
             <strong>How to read this report.</strong>{" "}
             These values are averages across the complete reporting
@@ -953,7 +1021,6 @@ function PrintReport({ payload, rows, gaps, stats, periodText, theme }) {
                 } during this window. Reporting gaps are marked in the charts.`
               : " The agent reported without interruption throughout the selected window."}
           </div> */}
-
 
           {/* <div className="capacity-dash__print-section-label">
             REPORT CONTENTS
@@ -984,225 +1051,161 @@ function PrintReport({ payload, rows, gaps, stats, periodText, theme }) {
           </div> */}
 
           <div className="capacity-dash__print-section-label">
-  REPORT CONTENTS
-</div>
+            REPORT CONTENTS
+          </div>
 
-<div className="capacity-dash__print-contents">
+          <div className="capacity-dash__print-contents">
+            <div className="capacity-dash__print-content-row">
+              <span className="capacity-dash__print-content-number">02</span>
 
-  <div className="capacity-dash__print-content-row">
-    <span className="capacity-dash__print-content-number">
-      02
-    </span>
+              <span className="capacity-dash__print-content-title">
+                Executive Summary
+              </span>
 
-    <span className="capacity-dash__print-content-title">
-      Executive Summary
-    </span>
+              <span className="capacity-dash__print-content-unit">
+                Overview
+              </span>
+            </div>
 
-    <span className="capacity-dash__print-content-unit">
-      Overview
-    </span>
-  </div>
+            {PANES.map((pane, index) => (
+              <div className="capacity-dash__print-content-row" key={pane.id}>
+                <span className="capacity-dash__print-content-number">
+                  {String(index + 3).padStart(2, "0")}
+                </span>
 
-  {PANES.map((pane, index) => (
-    <div
-      className="capacity-dash__print-content-row"
-      key={pane.id}
-    >
-      <span className="capacity-dash__print-content-number">
-        {String(index + 3).padStart(2, "0")}
-      </span>
+                <span className="capacity-dash__print-content-title">
+                  {pane.title}
+                </span>
 
-      <span className="capacity-dash__print-content-title">
-        {pane.title}
-      </span>
-
-      <span className="capacity-dash__print-content-unit">
-        {pane.unit}
-      </span>
-    </div>
-  ))}
-
-</div>
-
+                <span className="capacity-dash__print-content-unit">
+                  {pane.unit}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
-
 
         <div className="capacity-dash__print-cover-bottom">
-          <span>
-            Generated from Guardlynx agent telemetry.
-          </span>
+          <span>Generated from Guardlynx agent telemetry.</span>
 
-          <span>
-            Capacity Monitoring Report · Page 1 of {pageCount}
-          </span>
+          <span>Capacity Monitoring Report · Page 1 of {pageCount}</span>
         </div>
-
       </section>
 
       {/* =======================================================
     PAGE 02 — EXECUTIVE SUMMARY
     ======================================================= */}
 
-<section className="capacity-dash__print-page capacity-dash__print-summary-page">
+      <section className="capacity-dash__print-page capacity-dash__print-summary-page">
+        <div className="capacity-dash__print-page-number">02</div>
 
-  <div className="capacity-dash__print-page-number">
-    02
-  </div>
+        <div className="capacity-dash__print-page-heading">
+          <div className="capacity-dash__print-eyebrow">CAPACITY OVERVIEW</div>
 
-  <div className="capacity-dash__print-page-heading">
+          <h2 className="capacity-dash__print-summary-title">
+            Executive Summary
+          </h2>
 
-    <div className="capacity-dash__print-eyebrow">
-      CAPACITY OVERVIEW
-    </div>
-
-    <h2 className="capacity-dash__print-summary-title">
-      Executive Summary
-    </h2>
-
-    <div className="capacity-dash__print-summary-subtitle">
-      Consolidated resource utilization overview for the selected
-      monitoring window.
-    </div>
-
-  </div>
-
-
-  {/* REPORT INFORMATION */}
-
-  <div className="capacity-dash__print-section-label">
-    REPORT INFORMATION
-  </div>
-
-  <div className="capacity-dash__print-summary-meta">
-
-    <div className="capacity-dash__print-summary-meta-card">
-      <span>Monitoring Agent</span>
-      <strong>
-        {payload ? payload.agent_name : "—"}
-      </strong>
-    </div>
-
-    <div className="capacity-dash__print-summary-meta-card">
-      <span>Reporting Period</span>
-      <strong>
-        {periodText}
-      </strong>
-    </div>
-
-    <div className="capacity-dash__print-summary-meta-card">
-      <span>Total Samples</span>
-      <strong>
-        {sampleCount}
-      </strong>
-    </div>
-
-  </div>
-
-
-  {/* AVERAGE UTILIZATION */}
-
-  <div className="capacity-dash__print-section-label">
-    AVERAGE UTILIZATION
-  </div>
-
-  <div className="capacity-dash__print-kpis">
-
-    {stats.map((stat) => (
-      <div
-        className="capacity-dash__print-kpi"
-        key={stat.key}
-      >
-
-        <div className="capacity-dash__print-kpi-label">
-          {stat.label}
+          <div className="capacity-dash__print-summary-subtitle">
+            Consolidated resource utilization overview for the selected
+            monitoring window.
+          </div>
         </div>
 
-        <div className="capacity-dash__print-kpi-value">
+        {/* REPORT INFORMATION */}
 
-          {summary[stat.key] == null
-            ? "—"
-            : Number(summary[stat.key]).toFixed(2)}
-
-          {summary[stat.key] != null && (
-            <span className="capacity-dash__print-kpi-unit">
-              {stat.unit}
-            </span>
-          )}
-
+        <div className="capacity-dash__print-section-label">
+          REPORT INFORMATION
         </div>
 
-      </div>
-    ))}
+        <div className="capacity-dash__print-summary-meta">
+          <div className="capacity-dash__print-summary-meta-card">
+            <span>Monitoring Agent</span>
+            <strong>{payload ? payload.agent_name : "—"}</strong>
+          </div>
 
-  </div>
+          <div className="capacity-dash__print-summary-meta-card">
+            <span>Reporting Period</span>
+            <strong>{periodText}</strong>
+          </div>
 
+          <div className="capacity-dash__print-summary-meta-card">
+            <span>Total Samples</span>
+            <strong>{sampleCount}</strong>
+          </div>
+        </div>
 
-  {/* MONITORING COVERAGE */}
+        {/* AVERAGE UTILIZATION */}
 
-  <div className="capacity-dash__print-section-label">
-    MONITORING COVERAGE
-  </div>
+        <div className="capacity-dash__print-section-label">
+          AVERAGE UTILIZATION
+        </div>
 
-  <div className="capacity-dash__print-coverage">
+        <div className="capacity-dash__print-kpis">
+          {stats.map((stat) => (
+            <div className="capacity-dash__print-kpi" key={stat.key}>
+              <div className="capacity-dash__print-kpi-label">{stat.label}</div>
 
-    {PANES.map((pane) => (
-      <div
-        className="capacity-dash__print-coverage-row"
-        key={pane.id}
-      >
+              <div className="capacity-dash__print-kpi-value">
+                {summary[stat.key] == null
+                  ? "—"
+                  : Number(summary[stat.key]).toFixed(2)}
 
-        <span className="capacity-dash__print-coverage-name">
-          {pane.title}
-        </span>
+                {summary[stat.key] != null && (
+                  <span className="capacity-dash__print-kpi-unit">
+                    {stat.unit}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
 
-        <span className="capacity-dash__print-coverage-unit">
-          {pane.unit}
-        </span>
+        {/* MONITORING COVERAGE */}
 
-        <span className="capacity-dash__print-coverage-status">
-          Available
-        </span>
+        <div className="capacity-dash__print-section-label">
+          MONITORING COVERAGE
+        </div>
 
-      </div>
-    ))}
+        <div className="capacity-dash__print-coverage">
+          {PANES.map((pane) => (
+            <div className="capacity-dash__print-coverage-row" key={pane.id}>
+              <span className="capacity-dash__print-coverage-name">
+                {pane.title}
+              </span>
 
-  </div>
+              <span className="capacity-dash__print-coverage-unit">
+                {pane.unit}
+              </span>
 
+              <span className="capacity-dash__print-coverage-status">
+                Available
+              </span>
+            </div>
+          ))}
+        </div>
 
-  {/* INTERPRETATION NOTE */}
+        {/* INTERPRETATION NOTE */}
 
-  <div className="capacity-dash__print-summary-note">
-
-    <strong>How to read this summary.</strong>{" "}
-    The values above are averages across the complete reporting
-    window. Short-lived spikes may have limited effect on an
-    average, so the summary should be reviewed together with the
-    detailed evidence charts on the following pages.
-
-    {gaps.length
-      ? ` The agent stopped reporting ${gaps.length} ${
-          gaps.length === 1 ? "time" : "times"
-        } during this window. Reporting gaps are identified on the
+        <div className="capacity-dash__print-summary-note">
+          <strong>How to read this summary.</strong> The values above are
+          averages across the complete reporting window. Short-lived spikes may
+          have limited effect on an average, so the summary should be reviewed
+          together with the detailed evidence charts on the following pages.
+          {gaps.length
+            ? ` The agent stopped reporting ${gaps.length} ${
+                gaps.length === 1 ? "time" : "times"
+              } during this window. Reporting gaps are identified on the
         corresponding evidence pages.`
-      : " The agent reported without interruption throughout the selected window."}
+            : " The agent reported without interruption throughout the selected window."}
+        </div>
 
-  </div>
+        <div className="capacity-dash__print-page-footer">
+          <span>GUARDLYNX · CAPACITY MONITORING</span>
 
-
-  <div className="capacity-dash__print-page-footer">
-
-    <span>
-      GUARDLYNX · CAPACITY MONITORING
-    </span>
-
-    <span>
-      CONFIDENTIAL · Page 2 of {pageCount}
-    </span>
-
-  </div>
-
-</section>
-
+          <span>CONFIDENTIAL · Page 2 of {pageCount}</span>
+        </div>
+      </section>
 
       {/* =======================================================
           EVIDENCE PAGES
@@ -1215,14 +1218,11 @@ function PrintReport({ payload, rows, gaps, stats, periodText, theme }) {
             className="capacity-dash__print-page capacity-dash__print-evidence-page"
             key={pane.id}
           >
-
             <div className="capacity-dash__print-page-number">
               {String(index + 3).padStart(2, "0")}
             </div>
 
-
             <div className="capacity-dash__print-page-heading">
-
               <div className="capacity-dash__print-eyebrow">
                 CAPACITY EVIDENCE
               </div>
@@ -1234,28 +1234,16 @@ function PrintReport({ payload, rows, gaps, stats, periodText, theme }) {
               <div className="capacity-dash__print-evidence-unit">
                 Measurement unit: {pane.unit}
               </div>
-
             </div>
-
 
             {pane.lead && (
-              <p className="capacity-dash__print-evidence-lead">
-                {pane.lead}
-              </p>
+              <p className="capacity-dash__print-evidence-lead">{pane.lead}</p>
             )}
 
-
-            <div className="capacity-dash__print-section-label">
-              EVIDENCE
-            </div>
-
+            <div className="capacity-dash__print-section-label">EVIDENCE</div>
 
             <div className="capacity-dash__print-chart-card">
-
-              <PaneHeader
-                pane={pane}
-                lines={lines}
-              />
+              <PaneHeader pane={pane} lines={lines} />
 
               <ChartBody
                 lines={lines}
@@ -1269,16 +1257,13 @@ function PrintReport({ payload, rows, gaps, stats, periodText, theme }) {
                 width={PRINT_W}
                 height={PRINT_H}
               />
-
             </div>
-
 
             <div className="capacity-dash__print-evidence-note">
               <div>
                 <span className="capacity-dash__print-evidence-note-label">
                   Window
                 </span>
-
                 Full reporting range
               </div>
 
@@ -1299,31 +1284,25 @@ function PrintReport({ payload, rows, gaps, stats, periodText, theme }) {
               </div>
             </div>
 
-
             {gaps.length > 0 && (
               <p className="capacity-dash__print-gap-note">
                 {gaps.length} reporting{" "}
-                {gaps.length === 1 ? "gap was" : "gaps were"} detected.
-                During these intervals the agent was not reporting, so no
-                measurements were available.
+                {gaps.length === 1 ? "gap was" : "gaps were"} detected. During
+                these intervals the agent was not reporting, so no measurements
+                were available.
               </p>
             )}
 
-
             <div className="capacity-dash__print-page-footer">
-              <span>
-                GUARDLYNX · CAPACITY MONITORING
-              </span>
+              <span>GUARDLYNX · CAPACITY MONITORING</span>
 
               <span>
                 CONFIDENTIAL · Page {index + 3} of {pageCount}
               </span>
             </div>
-
           </section>
         );
       })}
-
     </div>
   );
 }
@@ -1337,13 +1316,20 @@ export default function CapacityDashboard() {
   // written by hand against the API's own parameter name.
   const [searchParams, setSearchParams] = useSearchParams();
   const initialAgent = useMemo(
-    () => (searchParams.get("agent") || searchParams.get("agent_name") || "").trim(),
+    () =>
+      (
+        searchParams.get("agent") ||
+        searchParams.get("agent_name") ||
+        ""
+      ).trim(),
     // read once, on arrival: later edits come from the controls, not the URL
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [],
   );
 
-  const [agentName, setAgentName] = useState(initialAgent || "UpdatedWindowAgent");
+  const [agentName, setAgentName] = useState(
+    initialAgent || "UpdatedWindowAgent",
+  );
   const [fromLocal, setFromLocal] = useState(initial.from);
   const [toLocal, setToLocal] = useState(initial.to);
   // the selected "Range" preset in hours ("12"), or "custom" once From/To is edited
@@ -1362,21 +1348,31 @@ export default function CapacityDashboard() {
   const [theme, setTheme] = useState(initialTheme);
   const [printing, setPrinting] = useState(false);
 
-  // ── communication / send PDF ───────────────────────────────────
+  const [sendModalOpen, setSendModalOpen] = useState(false);
 
-const [sendModalOpen, setSendModalOpen] = useState(false);
+  const [sendSubject, setSendSubject] = useState("Capacity Monitoring Report");
+  const [sendBody, setSendBody] = useState("");
 
-const [channels, setChannels] = useState([]);
-const [channelReadiness, setChannelReadiness] = useState([]);
+  // Recipient communication channels
+  const [channels, setChannels] = useState([]);
 
-const [channelsLoading, setChannelsLoading] = useState(false);
-const [selectedChannelIds, setSelectedChannelIds] = useState([]);
+  // Configured sender accounts
+  const [channelAccounts, setChannelAccounts] = useState([]);
 
-const [sendingPdf, setSendingPdf] = useState(false);
-const [sendError, setSendError] = useState("");
-const [sendSuccess, setSendSuccess] = useState("");
+  // Loading sender accounts + recipients
+  const [channelsLoading, setChannelsLoading] = useState(false);
 
-const [sendReportReady, setSendReportReady] = useState(false);
+  // Selected sender account
+  const [selectedAccountId, setSelectedAccountId] = useState(null);
+
+  // Selected recipients
+  const [selectedChannelIds, setSelectedChannelIds] = useState([]);
+
+  const [sendingPdf, setSendingPdf] = useState(false);
+  const [sendError, setSendError] = useState("");
+  const [sendSuccess, setSendSuccess] = useState("");
+
+  const [sendReportReady, setSendReportReady] = useState(false);
 
   const abortRef = useRef(null);
   const requestRef = useRef(0);
@@ -1396,49 +1392,51 @@ const [sendReportReady, setSendReportReady] = useState(false);
       fromDt: istInputToApi(fromLocal, "00"),
       toDt: istInputToApi(toLocal, "59"),
     }),
-    [agentName, fromLocal, toLocal]
+    [agentName, fromLocal, toLocal],
   );
 
-  const load = useCallback(
-    async (params) => {
-      if (!params.agentName) {
-        setError({ message: "Enter an agent name to load.", status: 0, url: "" });
-        setStatus("error");
+  const load = useCallback(async (params) => {
+    if (!params.agentName) {
+      setError({ message: "Enter an agent name to load.", status: 0, url: "" });
+      setStatus("error");
+      return;
+    }
+    if (params.fromDt >= params.toDt) {
+      setError({
+        message: "From must be earlier than To.",
+        status: 0,
+        url: "",
+      });
+      setStatus("error");
+      return;
+    }
+
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const ticket = ++requestRef.current;
+
+    setStatus("loading");
+    setError(null);
+
+    try {
+      const data = await fetchOverview(params, { signal: controller.signal });
+      if (ticket !== requestRef.current) return; // a newer load won
+      setPayload(data);
+      setStatus("success");
+    } catch (err) {
+      if (err && (err.code === "ERR_CANCELED" || err.name === "CanceledError"))
         return;
-      }
-      if (params.fromDt >= params.toDt) {
-        setError({ message: "From must be earlier than To.", status: 0, url: "" });
-        setStatus("error");
-        return;
-      }
-
-      if (abortRef.current) abortRef.current.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const ticket = ++requestRef.current;
-
-      setStatus("loading");
-      setError(null);
-
-      try {
-        const data = await fetchOverview(params, { signal: controller.signal });
-        if (ticket !== requestRef.current) return; // a newer load won
-        setPayload(data);
-        setStatus("success");
-      } catch (err) {
-        if (err && (err.code === "ERR_CANCELED" || err.name === "CanceledError")) return;
-        if (ticket !== requestRef.current) return;
-        // The last good payload stays in state, so the charts stay on screen.
-        setError({
-          message: err.message,
-          status: err.status || 0,
-          url: err.url || absoluteOverviewUrl(params),
-        });
-        setStatus("error");
-      }
-    },
-    []
-  );
+      if (ticket !== requestRef.current) return;
+      // The last good payload stays in state, so the charts stay on screen.
+      setError({
+        message: err.message,
+        status: err.status || 0,
+        url: err.url || absoluteOverviewUrl(params),
+      });
+      setStatus("error");
+    }
+  }, []);
 
   // Reset the shared window whenever the underlying run changes size — every
   // pane adopts it, so a fresh load starts them all at full range.
@@ -1500,298 +1498,242 @@ const [sendReportReady, setSendReportReady] = useState(false);
     setPrinting(true);
   };
 
+  const openSendModal = async () => {
+    if (!rows.length || sendingPdf) return;
+
+    setSendModalOpen(true);
+
+    setSendError("");
+    setSendSuccess("");
+
+    setChannelsLoading(true);
+
+    try {
+      const [channelList, accountList] = await Promise.all([
+        fetchChannels(),
+        fetchChannelAccounts(),
+      ]);
+
+      setChannels(channelList || []);
+
+      // Only active and verified sender accounts should be selectable.
+      setChannelAccounts(
+        (accountList || []).filter(
+          (account) =>
+            account.is_active !== false && account.is_verified !== false,
+        ),
+      );
+
+      // Reset previous selections every time modal opens.
+      setSelectedAccountId(null);
+      setSelectedChannelIds([]);
+      setSendSubject("Capacity Monitoring Report");
+
+      setSendBody(
+        `Capacity Monitoring Report for ${
+          payload?.agent_name || agentName
+        }. Reporting period: ${`${fromLocal.replace("T", " ")} – ${toLocal.replace("T", " ")}`}.`,
+      );
+    } catch (err) {
+      setSendError(
+        err?.message ||
+          "Unable to load sender accounts or communication channels.",
+      );
+    } finally {
+      setChannelsLoading(false);
+    }
+  };
 
   /**
- * Open the communication-channel selector and load the latest
- * channel list + backend readiness information.
- */
-const openSendModal = async () => {
-  if (!rows.length || sendingPdf) return;
+   * Close the send modal.
+   *
+   * A PDF send cannot be cancelled halfway through because the backend may
+   * already be delivering to some channels.
+   */
+  const closeSendModal = () => {
+    if (sendingPdf) return;
 
-  setSendModalOpen(true);
-  setSendError("");
-  setSendSuccess("");
-  setChannelsLoading(true);
+    setSendModalOpen(false);
+    setSendError("");
+    setSendSuccess("");
+  };
 
-  try {
-    const [channelList, readinessList] = await Promise.all([
-      fetchChannels(),
-      fetchChannelReadiness(),
-    ]);
+  /**
+   * Select or unselect one specific communication-channel row.
+   */
+  const toggleChannelSelection = (channelId) => {
+    setSelectedChannelIds((current) =>
+      current.includes(channelId)
+        ? current.filter((id) => id !== channelId)
+        : [...current, channelId],
+    );
+  };
 
-    setChannels(channelList || []);
-    setChannelReadiness(readinessList || []);
+  const handleAccountSelection = (accountId) => {
+    const nextAccountId = Number(accountId);
 
-    // Do not automatically select channels. The user explicitly chooses
-    // where the report should go.
+    setSelectedAccountId(nextAccountId);
+
+    // Sender change hone par old recipients clear kar do,
+    // because sender type may be different.
     setSelectedChannelIds([]);
-  } catch (err) {
-    setSendError(err?.message || "Unable to load communication channels.");
-  } finally {
-    setChannelsLoading(false);
-  }
-};
 
+    setSendError("");
+    setSendSuccess("");
+  };
 
-/**
- * Close the send modal.
- *
- * A PDF send cannot be cancelled halfway through because the backend may
- * already be delivering to some channels.
- */
-const closeSendModal = () => {
-  if (sendingPdf) return;
-
-  setSendModalOpen(false);
-  setSendError("");
-  setSendSuccess("");
-};
-
-
-/**
- * Select or unselect one specific communication-channel row.
- */
-const toggleChannelSelection = (channelId) => {
-  setSelectedChannelIds((current) =>
-    current.includes(channelId)
-      ? current.filter((id) => id !== channelId)
-      : [...current, channelId]
+  const selectedSenderAccount = channelAccounts.find(
+    (account) => account.id === Number(selectedAccountId),
   );
-};
 
+  const compatibleChannels = useMemo(() => {
+    if (!selectedSenderAccount) {
+      return [];
+    }
 
-/**
- * Find the backend readiness record belonging to one channel.
- */
-const readinessForChannel = (channelId) =>
-  channelReadiness.find((item) => item.id === channelId);
+    const senderType = String(
+      selectedSenderAccount.channel_type || "",
+    ).toLowerCase();
 
+    return channels.filter((channel) => {
+      const recipientType = String(channel.type || "").toLowerCase();
 
-/**
- * Convert a Blob into the raw base64 string expected by the backend.
- *
- * The backend calls Python's base64.b64decode(), so we remove the
- * "data:application/pdf;base64," prefix produced by FileReader.
- */
-const blobToBase64 = (blob) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
+      // Gmail sender -> email recipient
+      if (senderType === "gmail") {
+        return ["email", "gmail"].includes(recipientType);
+      }
 
-    reader.onload = () => {
-      const result = String(reader.result || "");
-      const commaIndex = result.indexOf(",");
+      // Outlook sender -> outlook recipient
+      if (senderType === "outlook365") {
+        return ["outlook"].includes(recipientType);
+      }
 
-      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-    };
+      // Telegram sender -> telegram recipient
+      if (senderType === "telegram") {
+        return recipientType === "telegram";
+      }
 
-    reader.onerror = () => {
-      reject(new Error("Unable to prepare the PDF for sending."));
-    };
+      // WhatsApp sender -> WhatsApp recipient
+      if (senderType === "whatsapp") {
+        return recipientType === "whatsapp";
+      }
 
-    reader.readAsDataURL(blob);
-  });
+      // SMS sender -> SMS recipient
+      if (senderType === "sms") {
+        return recipientType === "sms";
+      }
 
+      // Jira sender
+      if (senderType === "jira") {
+        return recipientType === "jira";
+      }
 
-/**
- * Wait for the hidden PrintReport to render its charts before capturing it.
- */
-const waitForReportRender = () =>
-  new Promise((resolve) => {
-    window.requestAnimationFrame(() => {
+      return false;
+    });
+  }, [channels, selectedSenderAccount]);
+
+  /**
+   * Wait for the hidden PrintReport to render its charts before capturing it.
+   */
+  const waitForReportRender = () =>
+    new Promise((resolve) => {
       window.requestAnimationFrame(() => {
-        // Recharts can finish SVG layout one tick after React commits.
-        window.setTimeout(resolve, 250);
+        window.requestAnimationFrame(() => {
+          // Recharts can finish SVG layout one tick after React commits.
+          window.setTimeout(resolve, 250);
+        });
       });
     });
-  });
 
+  /**
+   * Capture the existing PrintReport and build a multi-page A4 PDF.
+   *
+   * IMPORTANT:
+   * - Existing Export PDF / window.print() is NOT used here.
+   * - The same PrintReport component is reused.
+   * - Each `.capacity-dash__print-page` becomes one PDF page.
+   */
+  const buildCapacityPdfBlob = async () => {
+    setSendReportReady(true);
 
-/**
- * Capture the existing PrintReport and build a multi-page A4 PDF.
- *
- * IMPORTANT:
- * - Existing Export PDF / window.print() is NOT used here.
- * - The same PrintReport component is reused.
- * - Each `.capacity-dash__print-page` becomes one PDF page.
- */
-const buildCapacityPdfBlob = async () => {
-  setSendReportReady(true);
+    await waitForReportRender();
 
-  await waitForReportRender();
+    const reportElement = sendReportRef.current;
 
-  const reportElement = sendReportRef.current;
+    if (!reportElement) {
+      throw new Error("The report could not be prepared for sending.");
+    }
 
-  if (!reportElement) {
-    throw new Error("The report could not be prepared for sending.");
-  }
+    const pages = Array.from(
+      reportElement.querySelectorAll(".capacity-dash__print-page"),
+    );
 
-  const pages = Array.from(
-    reportElement.querySelectorAll(".capacity-dash__print-page")
-  );
+    if (!pages.length) {
+      throw new Error("No report pages were available to create the PDF.");
+    }
 
-  if (!pages.length) {
-    throw new Error("No report pages were available to create the PDF.");
-  }
-
-  const pdf = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "a4",
-    compress: true,
-  });
-
-//   for (let index = 0; index < pages.length; index += 1) {
-//     const page = pages[index];
-
-//     // const canvas = await html2canvas(page, {
-//     //   scale: 2,
-//     //   useCORS: true,
-//     //   backgroundColor: "#ffffff",
-//     //   logging: false,
-//     //   windowWidth: page.scrollWidth,
-//     //   windowHeight: page.scrollHeight,
-//     // });
-
-//     const canvas = await html2canvas(page, {
-//   scale: 2,
-//   useCORS: true,
-//   backgroundColor: "#ffffff",
-//   logging: false,
-
-//   windowWidth: 794,
-//   windowHeight: 1123,
-
-//   onclone: (clonedDocument) => {
-//     let printCss = "";
-
-//     Array.from(document.styleSheets).forEach((styleSheet) => {
-//       try {
-//         Array.from(styleSheet.cssRules).forEach((rule) => {
-//           if (
-//             rule instanceof CSSMediaRule &&
-//             rule.media &&
-//             rule.media.mediaText.includes("print")
-//           ) {
-//             Array.from(rule.cssRules).forEach((printRule) => {
-//               printCss += `${printRule.cssText}\n`;
-//             });
-//           }
-//         });
-//       } catch (error) {
-//         // Ignore inaccessible stylesheets
-//       }
-//     });
-
-//     const style = clonedDocument.createElement("style");
-
-//     style.setAttribute(
-//       "data-capacity-send-pdf-print-styles",
-//       "true"
-//     );
-
-//     style.textContent = printCss;
-
-//     clonedDocument.head.appendChild(style);
-
-//     const printReport = clonedDocument.querySelector(
-//       ".capacity-dash__send-report-capture .capacity-dash__print"
-//     );
-
-//     if (printReport) {
-//       printReport.style.display = "block";
-//       printReport.style.visibility = "visible";
-//       printReport.style.position = "relative";
-//     }
-//   },
-// });
-
-//     const imageData = canvas.toDataURL("image/jpeg", 0.92);
-
-//     const pdfWidth = 210;
-//     const pdfHeight = 297;
-
-//     const imageWidth = pdfWidth;
-//     const imageHeight = (canvas.height * imageWidth) / canvas.width;
-
-//     // Every PrintReport page is designed as a page. Scale it down to fit
-//     // within A4 while keeping its aspect ratio.
-//     const renderHeight = Math.min(imageHeight, pdfHeight);
-//     const renderWidth = (canvas.width * renderHeight) / canvas.height;
-
-//     const x = (pdfWidth - renderWidth) / 2;
-//     const y = (pdfHeight - renderHeight) / 2;
-
-//     if (index > 0) {
-//       pdf.addPage();
-//     }
-
-//     pdf.addImage(
-//       imageData,
-//       "JPEG",
-//       x,
-//       y,
-//       renderWidth,
-//       renderHeight,
-//       undefined,
-//       "FAST"
-//     );
-//   }
-
-for (let index = 0; index < pages.length; index += 1) {
-  const page = pages[index];
-
-  const canvas = await html2canvas(page, {
-  scale: 2,
-  useCORS: true,
-  backgroundColor: "#ffffff",
-  logging: false,
-
-  windowWidth: page.scrollWidth || page.offsetWidth,
-  windowHeight: page.scrollHeight || page.offsetHeight,
-
-  onclone: (clonedDocument) => {
-    let printCss = "";
-
-    Array.from(document.styleSheets).forEach((styleSheet) => {
-      try {
-        Array.from(styleSheet.cssRules).forEach((rule) => {
-          if (
-            rule instanceof CSSMediaRule &&
-            rule.media &&
-            rule.media.mediaText.includes("print")
-          ) {
-            Array.from(rule.cssRules).forEach((printRule) => {
-              printCss += `${printRule.cssText}\n`;
-            });
-          }
-        });
-      } catch (error) {
-        // Ignore inaccessible stylesheets
-      }
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+      compress: true,
     });
 
-    const printStyle = clonedDocument.createElement("style");
+    for (let index = 0; index < pages.length; index += 1) {
+      const page = pages[index];
 
-    printStyle.setAttribute(
-      "data-capacity-send-pdf-print-styles",
-      "true"
-    );
+      const canvas = await html2canvas(page, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
 
-    printStyle.textContent = printCss;
+        windowWidth: page.scrollWidth || page.offsetWidth,
+        windowHeight: page.scrollHeight || page.offsetHeight,
 
-    clonedDocument.head.appendChild(printStyle);
+        onclone: (clonedDocument) => {
+          let printCss = "";
 
-    /*
-     * Override PRINT SAFETY rule.
-     */
-    const overrideStyle = clonedDocument.createElement("style");
+          Array.from(document.styleSheets).forEach((styleSheet) => {
+            try {
+              Array.from(styleSheet.cssRules).forEach((rule) => {
+                if (
+                  rule instanceof CSSMediaRule &&
+                  rule.media &&
+                  rule.media.mediaText.includes("print")
+                ) {
+                  Array.from(rule.cssRules).forEach((printRule) => {
+                    printCss += `${printRule.cssText}\n`;
+                  });
+                }
+              });
+            } catch (error) {
+              // Ignore inaccessible stylesheets
+            }
+          });
 
-    overrideStyle.setAttribute(
-      "data-capacity-send-pdf-overrides",
-      "true"
-    );
+          const printStyle = clonedDocument.createElement("style");
 
-    overrideStyle.textContent = `
+          printStyle.setAttribute(
+            "data-capacity-send-pdf-print-styles",
+            "true",
+          );
+
+          printStyle.textContent = printCss;
+
+          clonedDocument.head.appendChild(printStyle);
+
+          /*
+           * Override PRINT SAFETY rule.
+           */
+          const overrideStyle = clonedDocument.createElement("style");
+
+          overrideStyle.setAttribute(
+            "data-capacity-send-pdf-overrides",
+            "true",
+          );
+
+          overrideStyle.textContent = `
       .capacity-dash__send-overlay {
         display: none !important;
       }
@@ -1829,152 +1771,223 @@ for (let index = 0; index < pages.length; index += 1) {
       }
     `;
 
-    clonedDocument.head.appendChild(overrideStyle);
-  },
-});
+          clonedDocument.head.appendChild(overrideStyle);
+        },
+      });
 
-  /*
-   * Safety check:
-   * html2canvas ne valid canvas generate kiya hai ya nahi.
-   */
-  if (
-    !canvas.width ||
-    !canvas.height ||
-    !Number.isFinite(canvas.width) ||
-    !Number.isFinite(canvas.height)
-  ) {
-    throw new Error(
-      `Could not generate page ${index + 1}. ` +
-        `Canvas size: ${canvas.width} × ${canvas.height}`
-    );
-  }
+      /*
+       * Safety check:
+       * html2canvas ne valid canvas generate kiya hai ya nahi.
+       */
+      if (
+        !canvas.width ||
+        !canvas.height ||
+        !Number.isFinite(canvas.width) ||
+        !Number.isFinite(canvas.height)
+      ) {
+        throw new Error(
+          `Could not generate page ${index + 1}. ` +
+            `Canvas size: ${canvas.width} × ${canvas.height}`,
+        );
+      }
 
-  const imageData = canvas.toDataURL("image/jpeg", 0.92);
+      const imageData = canvas.toDataURL("image/jpeg", 0.92);
 
-  const pdfWidth = 210;
-  const pdfHeight = 297;
+      const pdfWidth = 210;
+      const pdfHeight = 297;
 
-  const canvasWidth = canvas.width;
-  const canvasHeight = canvas.height;
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
 
-  const imageRatio = canvasWidth / canvasHeight;
-  const pageRatio = pdfWidth / pdfHeight;
+      const imageRatio = canvasWidth / canvasHeight;
+      const pageRatio = pdfWidth / pdfHeight;
 
-  let renderWidth;
-  let renderHeight;
+      let renderWidth;
+      let renderHeight;
 
-  if (imageRatio > pageRatio) {
-    renderWidth = pdfWidth;
-    renderHeight = pdfWidth / imageRatio;
-  } else {
-    renderHeight = pdfHeight;
-    renderWidth = pdfHeight * imageRatio;
-  }
+      if (imageRatio > pageRatio) {
+        renderWidth = pdfWidth;
+        renderHeight = pdfWidth / imageRatio;
+      } else {
+        renderHeight = pdfHeight;
+        renderWidth = pdfHeight * imageRatio;
+      }
 
-  const x = (pdfWidth - renderWidth) / 2;
-  const y = (pdfHeight - renderHeight) / 2;
+      const x = (pdfWidth - renderWidth) / 2;
+      const y = (pdfHeight - renderHeight) / 2;
 
-  /*
-   * Final safety check before jsPDF.addImage()
-   */
-  if (
-    !Number.isFinite(x) ||
-    !Number.isFinite(y) ||
-    !Number.isFinite(renderWidth) ||
-    !Number.isFinite(renderHeight) ||
-    renderWidth <= 0 ||
-    renderHeight <= 0
-  ) {
-    throw new Error(
-      `Invalid PDF coordinates on page ${index + 1}: ` +
-        `x=${x}, y=${y}, width=${renderWidth}, height=${renderHeight}`
-    );
-  }
+      /*
+       * Final safety check before jsPDF.addImage()
+       */
+      if (
+        !Number.isFinite(x) ||
+        !Number.isFinite(y) ||
+        !Number.isFinite(renderWidth) ||
+        !Number.isFinite(renderHeight) ||
+        renderWidth <= 0 ||
+        renderHeight <= 0
+      ) {
+        throw new Error(
+          `Invalid PDF coordinates on page ${index + 1}: ` +
+            `x=${x}, y=${y}, width=${renderWidth}, height=${renderHeight}`,
+        );
+      }
 
-  if (index > 0) {
-    pdf.addPage();
-  }
+      if (index > 0) {
+        pdf.addPage();
+      }
 
-  pdf.addImage(
-    imageData,
-    "JPEG",
-    x,
-    y,
-    renderWidth,
-    renderHeight,
-    undefined,
-    "FAST"
-  );
-}
+      pdf.addImage(
+        imageData,
+        "JPEG",
+        x,
+        y,
+        renderWidth,
+        renderHeight,
+        undefined,
+        "FAST",
+      );
+    }
 
-  return pdf.output("blob");
-};
+    return pdf.output("blob");
+  };
 
+  const sendCapacityPdf = async () => {
+    if (!rows.length) {
+      setSendError("Load Capacity Dashboard data before sending a report.");
+      return;
+    }
 
-/**
- * Create the current Capacity Dashboard report and send it to the
- * communication channels selected by the user.
- */
-const sendCapacityPdf = async () => {
-  if (!rows.length) {
-    setSendError("Load Capacity Dashboard data before sending a report.");
-    return;
-  }
+    if (!sendSubject.trim()) {
+      setSendError("Enter a subject.");
+      return;
+    }
 
-  if (!selectedChannelIds.length) {
-    setSendError("Select at least one communication channel.");
-    return;
-  }
+    if (!sendBody.trim()) {
+      setSendError("Enter a message body.");
+      return;
+    }
 
-  setSendingPdf(true);
-  setSendError("");
-  setSendSuccess("");
+    if (!selectedAccountId) {
+      setSendError("Select a sender account.");
+      return;
+    }
 
-  try {
-    const pdfBlob = await buildCapacityPdfBlob();
+    if (!selectedChannelIds.length) {
+      setSendError("Select at least one communication channel.");
+      return;
+    }
 
-    const pdfBase64 = await blobToBase64(pdfBlob);
+    if (!selectedSenderAccount) {
+      setSendError("The selected sender account is no longer available.");
+      return;
+    }
 
-    const safeAgentName =
-      (payload?.agent_name || agentName || "capacity-report")
+    setSendingPdf(true);
+    setSendError("");
+    setSendSuccess("");
+
+    try {
+      /*
+       * Existing PDF generation remains exactly the same.
+       */
+      const pdfBlob = await buildCapacityPdfBlob();
+
+      const safeAgentName = (
+        payload?.agent_name ||
+        agentName ||
+        "capacity-report"
+      )
         .trim()
         .replace(/[^\w.-]+/g, "_");
 
-    const filename = `capacity_report_${safeAgentName}_${Date.now()}.pdf`;
+      const filename = `capacity_report_${safeAgentName}_${Date.now()}.pdf`;
 
-    const result = await sendCommunication({
-      title: "Capacity Monitoring Report",
-      message: `Capacity Monitoring Report for ${
-        payload?.agent_name || agentName
-      }. Reporting period: ${periodText}.`,
-      severity: "high",
-      channel_ids: selectedChannelIds,
-      pdf_base64: pdfBase64,
-      pdf_filename: filename,
-    });
+      /*
+       * Convert generated PDF Blob into File.
+       */
+      const pdfFile = new File([pdfBlob], filename, {
+        type: "application/pdf",
+      });
 
-    const sent = result?.sent ?? 0;
-    const total = result?.total ?? selectedChannelIds.length;
+      // const subject = "Capacity Monitoring Report";
 
-    setSendSuccess(
-      `${sent} of ${total} selected channel${
-        total === 1 ? "" : "s"
-      } processed successfully.`
-    );
-  } catch (err) {
-    setSendError(
-      err?.message ||
-        "Unable to generate or send the Capacity Monitoring Report."
-    );
-  } finally {
-    setSendingPdf(false);
+      // const body = `Capacity Monitoring Report for ${
+      //   payload?.agent_name || agentName
+      // }. Reporting period: ${periodText}.`;
 
-    // Remove the hidden PrintReport after the capture finishes.
-    setSendReportReady(false);
-  }
-};
+      /*
+       * Backend send-file API currently sends to ONE recipient
+       * per request.
+       *
+       * Therefore loop through selected communication channels.
+       */
+      const results = [];
 
+      for (const channelId of selectedChannelIds) {
+        try {
+          const result = await sendFileViaChannelAccount(selectedAccountId, {
+            subject: sendSubject.trim(),
+            body: sendBody.trim(),
+            communication_channel_id: channelId,
+            file: pdfFile,
+          });
 
+          results.push({
+            channelId,
+            success: true,
+            result,
+          });
+        } catch (err) {
+          results.push({
+            channelId,
+            success: false,
+            error: err?.message || "Unable to send report.",
+          });
+        }
+      }
+
+      const successful = results.filter((item) => item.success);
+
+      const failed = results.filter((item) => !item.success);
+
+      if (failed.length === 0) {
+        setSendSuccess(
+          `${successful.length} of ${selectedChannelIds.length} report${
+            selectedChannelIds.length === 1 ? "" : "s"
+          } sent successfully.`,
+        );
+      } else if (successful.length > 0) {
+        setSendSuccess(
+          `${successful.length} of ${
+            selectedChannelIds.length
+          } reports sent successfully.`,
+        );
+
+        setSendError(
+          `${failed.length} recipient${
+            failed.length === 1 ? "" : "s"
+          } could not receive the report.`,
+        );
+      } else {
+        const firstError = failed[0]?.error || "Unable to send the report.";
+
+        setSendError(firstError);
+      }
+    } catch (err) {
+      setSendError(
+        err?.message ||
+          "Unable to generate or send the Capacity Monitoring Report.",
+      );
+    } finally {
+      setSendingPdf(false);
+
+      /*
+       * Remove hidden PrintReport after capture.
+       */
+      setSendReportReady(false);
+    }
+  };
 
   /** Mirror the scope into the URL, so a refresh or a shared link keeps it. */
   const syncUrl = useCallback(
@@ -1985,7 +1998,7 @@ const sendCapacityPdf = async () => {
       else next.delete("agent");
       setSearchParams(next, { replace: true });
     },
-    [searchParams, setSearchParams]
+    [searchParams, setSearchParams],
   );
 
   const onSubmit = (event) => {
@@ -2025,8 +2038,10 @@ const sendCapacityPdf = async () => {
 
   // These drive the SHARED window from the Full range strip, so they move every
   // graph together. Per-graph zoom lives inside each ChartPane.
-  const zoomAll = (factor) => setMasterRange((r) => zoomAround(r, factor, lastIndex));
-  const showLastAll = (n) => setMasterRange(clampRange(lastIndex - n, lastIndex, lastIndex));
+  const zoomAll = (factor) =>
+    setMasterRange((r) => zoomAround(r, factor, lastIndex));
+  const showLastAll = (n) =>
+    setMasterRange(clampRange(lastIndex - n, lastIndex, lastIndex));
   const resetAll = () => setMasterRange(fullRange(lastIndex));
 
   const loading = status === "loading";
@@ -2041,7 +2056,9 @@ const sendCapacityPdf = async () => {
         <div className="capacity-dash__brand">
           <h1 className="capacity-dash__title">Capacity monitoring</h1>
           <p className="capacity-dash__subtitle">
-            {payload ? `${payload.agent_name} · ${rows.length} samples · times in IST` : "times in IST"}
+            {payload
+              ? `${payload.agent_name} · ${rows.length} samples · times in IST`
+              : "times in IST"}
           </p>
         </div>
 
@@ -2063,7 +2080,8 @@ const sendCapacityPdf = async () => {
               className="capacity-dash__select"
               value={preset}
               onChange={(e) => {
-                if (e.target.value !== "custom") applyPreset(Number(e.target.value));
+                if (e.target.value !== "custom")
+                  applyPreset(Number(e.target.value));
               }}
               disabled={loading}
               aria-label="Quick range"
@@ -2109,35 +2127,43 @@ const sendCapacityPdf = async () => {
             type="button"
             onClick={exportPdf}
             disabled={!rows.length || printing}
-            title={rows.length ? "Open the print dialog — choose Save as PDF" : "Load data first"}
+            title={
+              rows.length
+                ? "Open the print dialog — choose Save as PDF"
+                : "Load data first"
+            }
           >
             {printing ? "Preparing…" : "Export PDF"}
           </button>
 
           <button
-  className="capacity-dash__btn capacity-dash__btn--primary"
-  type="button"
-  onClick={openSendModal}
-  disabled={!rows.length || printing || sendingPdf}
-  title={
-    rows.length
-      ? "Send the Capacity Monitoring Report through communication channels"
-      : "Load data first"
-  }
->
-  {sendingPdf ? "Sending…" : "Send PDF"}
-</button>
+            className="capacity-dash__btn capacity-dash__btn--primary"
+            type="button"
+            onClick={openSendModal}
+            disabled={!rows.length || printing || sendingPdf}
+            title={
+              rows.length
+                ? "Send the Capacity Monitoring Report through communication channels"
+                : "Load data first"
+            }
+          >
+            {sendingPdf ? "Sending…" : "Send PDF"}
+          </button>
 
           <button
             className="capacity-dash__btn capacity-dash__btn--icon"
             type="button"
             onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
             aria-pressed={theme === "light"}
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            title={
+              theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+            }
           >
             <ThemeIcon mode={theme} />
             <span className="capacity-dash__sr-only">
-              {theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              {theme === "dark"
+                ? "Switch to light mode"
+                : "Switch to dark mode"}
             </span>
           </button>
         </form>
@@ -2150,8 +2176,14 @@ const sendCapacityPdf = async () => {
               {error.status ? `HTTP ${error.status} — ` : ""}
               {error.message}
             </p>
-            {error.url && <code className="capacity-dash__error-url">{error.url}</code>}
-            {payload && <p className="capacity-dash__error-note">Showing the last window that loaded.</p>}
+            {error.url && (
+              <code className="capacity-dash__error-url">{error.url}</code>
+            )}
+            {payload && (
+              <p className="capacity-dash__error-note">
+                Showing the last window that loaded.
+              </p>
+            )}
           </div>
           <button
             className="capacity-dash__btn"
@@ -2164,7 +2196,9 @@ const sendCapacityPdf = async () => {
         </div>
       )}
 
-      <div className={`capacity-dash__stats${loading ? " capacity-dash__stats--loading" : ""}`}>
+      <div
+        className={`capacity-dash__stats${loading ? " capacity-dash__stats--loading" : ""}`}
+      >
         {STATS.map((stat) => {
           const value = summary[stat.key];
           return (
@@ -2183,7 +2217,9 @@ const sendCapacityPdf = async () => {
         <div className="capacity-dash__stat capacity-dash__stat--samples">
           <span className="capacity-dash__stat-label">Samples</span>
           <span className="capacity-dash__stat-value">
-            {payload && payload.sample_count != null ? payload.sample_count : "—"}
+            {payload && payload.sample_count != null
+              ? payload.sample_count
+              : "—"}
             <span className="capacity-dash__stat-unit">pts</span>
           </span>
         </div>
@@ -2191,12 +2227,18 @@ const sendCapacityPdf = async () => {
 
       {isEmpty ? (
         <div className="capacity-dash__empty">
-          <p className="capacity-dash__empty-title">No samples in this window</p>
+          <p className="capacity-dash__empty-title">
+            No samples in this window
+          </p>
           <p className="capacity-dash__empty-sub">
             The agent reported nothing between {fromLocal.replace("T", " ")} and{" "}
             {toLocal.replace("T", " ")}.
           </p>
-          <button className="capacity-dash__btn" type="button" onClick={widenTo24h}>
+          <button
+            className="capacity-dash__btn"
+            type="button"
+            onClick={widenTo24h}
+          >
             Widen to last 24h
           </button>
         </div>
@@ -2204,10 +2246,15 @@ const sendCapacityPdf = async () => {
         <>
           <div className="capacity-dash__paneshead">
             <p className="capacity-dash__hint">
-              Each graph zooms on its own — wheel to zoom, drag to pan, shift-drag to box zoom,
-              double-click to reset. Use <strong>Full range</strong> below to zoom every graph at once.
+              Each graph zooms on its own — wheel to zoom, drag to pan,
+              shift-drag to box zoom, double-click to reset. Use{" "}
+              <strong>Full range</strong> below to zoom every graph at once.
             </p>
-            <div className="capacity-dash__layout" role="group" aria-label="Graphs per row">
+            <div
+              className="capacity-dash__layout"
+              role="group"
+              aria-label="Graphs per row"
+            >
               <span className="capacity-dash__layout-label">Per row</span>
               <button
                 type="button"
@@ -2259,31 +2306,56 @@ const sendCapacityPdf = async () => {
               <div className="capacity-dash__pane-titles">
                 <h2 className="capacity-dash__pane-title">Full range</h2>
                 <span className="capacity-dash__pane-unit">
-                  zooms every graph · {formatClock(rows[masterRange[0]] && rows[masterRange[0]].ms)}–
-                  {formatClock(rows[masterRange[1]] && rows[masterRange[1]].ms)} ·{" "}
-                  {masterRange[1] - masterRange[0] + 1} pts
+                  zooms every graph ·{" "}
+                  {formatClock(rows[masterRange[0]] && rows[masterRange[0]].ms)}
+                  –
+                  {formatClock(rows[masterRange[1]] && rows[masterRange[1]].ms)}{" "}
+                  · {masterRange[1] - masterRange[0] + 1} pts
                 </span>
               </div>
               <div className="capacity-dash__pane-btns">
-                <button className="capacity-dash__btn capacity-dash__btn--sm" type="button" onClick={() => zoomAll(ZOOM_IN)}>
+                <button
+                  className="capacity-dash__btn capacity-dash__btn--sm"
+                  type="button"
+                  onClick={() => zoomAll(ZOOM_IN)}
+                >
                   Zoom in
                 </button>
-                <button className="capacity-dash__btn capacity-dash__btn--sm" type="button" onClick={() => zoomAll(ZOOM_OUT)}>
+                <button
+                  className="capacity-dash__btn capacity-dash__btn--sm"
+                  type="button"
+                  onClick={() => zoomAll(ZOOM_OUT)}
+                >
                   Zoom out
                 </button>
-                <button className="capacity-dash__btn capacity-dash__btn--sm" type="button" onClick={() => showLastAll(30)}>
+                <button
+                  className="capacity-dash__btn capacity-dash__btn--sm"
+                  type="button"
+                  onClick={() => showLastAll(30)}
+                >
                   Last 30
                 </button>
-                <button className="capacity-dash__btn capacity-dash__btn--sm" type="button" onClick={() => showLastAll(100)}>
+                <button
+                  className="capacity-dash__btn capacity-dash__btn--sm"
+                  type="button"
+                  onClick={() => showLastAll(100)}
+                >
                   Last 100
                 </button>
-                <button className="capacity-dash__btn capacity-dash__btn--sm" type="button" onClick={resetAll}>
+                <button
+                  className="capacity-dash__btn capacity-dash__btn--sm"
+                  type="button"
+                  onClick={resetAll}
+                >
                   All
                 </button>
               </div>
             </header>
             <ResponsiveContainer width="100%" height={92}>
-              <AreaChart data={rows} margin={{ top: 4, right: 14, bottom: 0, left: 4 }}>
+              <AreaChart
+                data={rows}
+                margin={{ top: 4, right: 14, bottom: 0, left: 4 }}
+              >
                 <YAxis hide domain={["auto", "auto"]} />
                 <XAxis dataKey="i" type="number" domain={[0, lastIndex]} hide />
                 <Area
@@ -2307,11 +2379,24 @@ const sendCapacityPdf = async () => {
                     startIndex={masterRange[0]}
                     endIndex={masterRange[1]}
                     onChange={(next) => {
-                      if (!next || next.startIndex == null || next.endIndex == null) return;
-                      if (next.startIndex === masterRange[0] && next.endIndex === masterRange[1]) return;
-                      setMasterRange(clampRange(next.startIndex, next.endIndex, lastIndex));
+                      if (
+                        !next ||
+                        next.startIndex == null ||
+                        next.endIndex == null
+                      )
+                        return;
+                      if (
+                        next.startIndex === masterRange[0] &&
+                        next.endIndex === masterRange[1]
+                      )
+                        return;
+                      setMasterRange(
+                        clampRange(next.startIndex, next.endIndex, lastIndex),
+                      );
                     }}
-                    tickFormatter={(i) => (rows[i] ? formatClock(rows[i].ms) : "")}
+                    tickFormatter={(i) =>
+                      rows[i] ? formatClock(rows[i].ms) : ""
+                    }
                   />
                 )}
               </AreaChart>
@@ -2321,214 +2406,304 @@ const sendCapacityPdf = async () => {
       )}
 
       {sendModalOpen && (
-  <div
-    className="capacity-dash__send-overlay"
-    role="presentation"
-    onMouseDown={(event) => {
-      if (event.target === event.currentTarget) {
-        closeSendModal();
-      }
-    }}
-  >
-    <section
-      className="capacity-dash__send-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="capacity-send-title"
-    >
-      <header className="capacity-dash__send-header">
-        <div>
-          <p className="capacity-dash__send-eyebrow">
-            COMMUNICATION CHANNELS
-          </p>
-
-          <h2
-            className="capacity-dash__send-title"
-            id="capacity-send-title"
-          >
-            Send Capacity Report
-          </h2>
-
-          <p className="capacity-dash__send-subtitle">
-            Select the channels that should receive this Capacity Monitoring
-            Report.
-          </p>
-        </div>
-
-        <button
-          className="capacity-dash__send-close"
-          type="button"
-          onClick={closeSendModal}
-          disabled={sendingPdf}
-          aria-label="Close send report dialog"
+        <div
+          className="capacity-dash__send-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeSendModal();
+            }
+          }}
         >
-          ×
-        </button>
-      </header>
-
-      <div className="capacity-dash__send-body">
-
-        {sendError && (
-          <div
-            className="capacity-dash__send-error"
-            role="alert"
+          <section
+            className="capacity-dash__send-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="capacity-send-title"
           >
-            {sendError}
-          </div>
-        )}
+            <header className="capacity-dash__send-header">
+              <div>
+                <p className="capacity-dash__send-eyebrow">
+                  COMMUNICATION CHANNELS
+                </p>
 
-        {sendSuccess && (
-          <div
-            className="capacity-dash__send-success"
-            role="status"
-          >
-            {sendSuccess}
-          </div>
-        )}
-
-        {channelsLoading ? (
-          <div className="capacity-dash__send-loading">
-            Loading communication channels…
-          </div>
-        ) : channels.length === 0 ? (
-          <div className="capacity-dash__send-empty">
-            No communication channels have been added yet.
-          </div>
-        ) : (
-          <div className="capacity-dash__channel-list">
-
-            {channels.map((channel) => {
-              const readiness = readinessForChannel(channel.id);
-
-              const ready =
-                readiness == null
-                  ? null
-                  : Boolean(readiness.ready);
-
-              const supportsPdf =
-                readiness != null &&
-                Boolean(readiness.supports_pdf);
-
-              return (
-                <label
-                  className={`capacity-dash__channel ${
-                    selectedChannelIds.includes(channel.id)
-                      ? "capacity-dash__channel--selected"
-                      : ""
-                  } ${
-                    ready === false
-                      ? "capacity-dash__channel--not-ready"
-                      : ""
-                  }`}
-                  key={channel.id}
+                <h2
+                  className="capacity-dash__send-title"
+                  id="capacity-send-title"
                 >
-                  <input
-                    type="checkbox"
-                    checked={selectedChannelIds.includes(channel.id)}
-                    onChange={() =>
-                      toggleChannelSelection(channel.id)
-                    }
-                    disabled={sendingPdf}
-                  />
+                  Send Capacity Report
+                </h2>
 
-                  <div className="capacity-dash__channel-main">
+                <p className="capacity-dash__send-subtitle">
+                  Select the channels that should receive this Capacity
+                  Monitoring Report.
+                </p>
+              </div>
 
-                    <div className="capacity-dash__channel-name">
-                      {channel.name}
-                    </div>
+              <button
+                className="capacity-dash__send-close"
+                type="button"
+                onClick={closeSendModal}
+                disabled={sendingPdf}
+                aria-label="Close send report dialog"
+              >
+                ×
+              </button>
+            </header>
 
-                    <div className="capacity-dash__channel-value">
-                      {channel.value}
-                    </div>
+            <div className="capacity-dash__send-body">
+              {sendError && (
+                <div className="capacity-dash__send-error" role="alert">
+                  {sendError}
+                </div>
+              )}
 
-                    <div className="capacity-dash__channel-meta">
+              {sendSuccess && (
+                <div className="capacity-dash__send-success" role="status">
+                  {sendSuccess}
+                </div>
+              )}
 
-                      <span className="capacity-dash__channel-type">
-                        {channel.type}
+              {channelsLoading ? (
+                <div className="capacity-dash__send-loading">
+                  Loading sender accounts and communication channels…
+                </div>
+              ) : (
+                <>
+                  <section className="capacity-dash__message-section">
+                    <div className="capacity-dash__send-section-heading">
+  <div className="capacity-dash__step-number">1</div>
+
+  <div>
+    <h3 className="capacity-dash__send-section-title">
+      Message
+    </h3>
+
+    <p className="capacity-dash__send-section-description">
+      Add the subject and message that will accompany your PDF report.
+    </p>
+  </div>
+</div>
+
+                    <label className="capacity-dash__message-field">
+                      <span className="capacity-dash__message-label">
+                        Subject
                       </span>
 
-                      {ready === true && (
-                        <span className="capacity-dash__channel-ready">
-                          Ready
-                        </span>
-                      )}
+                      <input
+                        className="capacity-dash__message-input"
+                        type="text"
+                        value={sendSubject}
+                        onChange={(e) => setSendSubject(e.target.value)}
+                        placeholder="Enter subject"
+                        disabled={sendingPdf}
+                      />
+                    </label>
 
-                      {ready === false && (
-                        <span className="capacity-dash__channel-not-ready">
-                          Not configured
-                        </span>
-                      )}
+                    <label className="capacity-dash__message-field">
+                      <span className="capacity-dash__message-label">Body</span>
 
-                      {supportsPdf && (
-                        <span className="capacity-dash__channel-pdf">
-                          PDF supported
-                        </span>
-                      )}
+                      <textarea
+                        className="capacity-dash__message-textarea"
+                        value={sendBody}
+                        onChange={(e) => setSendBody(e.target.value)}
+                        placeholder="Enter message"
+                        rows={5}
+                        disabled={sendingPdf}
+                      />
+                    </label>
+                  </section>
+                  {/* ───────────────────────────────────────────────
+          SENDER ACCOUNT
+      ─────────────────────────────────────────────── */}
 
-                      {readiness && !supportsPdf && (
-                        <span className="capacity-dash__channel-message-only">
-                          Message only
-                        </span>
-                      )}
+                  <section className="capacity-dash__sender-section">
+                    <div className="capacity-dash__send-section-heading">
+  <div className="capacity-dash__step-number">2</div>
 
-                    </div>
+  <div>
+    <h3 className="capacity-dash__send-section-title">
+      Sender account
+    </h3>
 
-                    {ready === false && readiness?.note && (
-                      <div className="capacity-dash__channel-note">
-                        {readiness.note}
+    <p className="capacity-dash__send-section-description">
+      Choose the verified account you want to send this report from.
+    </p>
+  </div>
+</div>
+
+                    {channelAccounts.length === 0 ? (
+                      <div className="capacity-dash__send-empty">
+                        No verified sender accounts have been configured yet.
+                      </div>
+                    ) : (
+                      <div className="capacity-dash__sender-list">
+                        {channelAccounts.map((account) => (
+                          <label
+                            key={account.id}
+                            className={`capacity-dash__sender-account ${
+                              Number(selectedAccountId) === account.id
+                                ? "capacity-dash__sender-account--selected"
+                                : ""
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="capacity-sender-account"
+                              value={account.id}
+                              checked={Number(selectedAccountId) === account.id}
+                              onChange={() =>
+                                handleAccountSelection(account.id)
+                              }
+                              disabled={sendingPdf}
+                            />
+
+                            <div className="capacity-dash__sender-main">
+                              <div className="capacity-dash__sender-name">
+                                {account.label}
+                              </div>
+
+                              <div className="capacity-dash__sender-identifier">
+                                {account.identifier}
+                              </div>
+
+                              <div className="capacity-dash__sender-type">
+                                {account.channel_type}
+                              </div>
+                            </div>
+                          </label>
+                        ))}
                       </div>
                     )}
+                  </section>
 
-                  </div>
-                </label>
-              );
-            })}
+                  {/* ───────────────────────────────────────────────
+          RECIPIENT CHANNELS
+      ─────────────────────────────────────────────── */}
 
-          </div>
-        )}
+                  <section className="capacity-dash__recipient-section">
+                    <div className="capacity-dash__send-section-heading">
+  <div className="capacity-dash__step-number">3</div>
 
-      </div>
+  <div>
+    <h3 className="capacity-dash__send-section-title">
+      Recipients
+    </h3>
 
-      <footer className="capacity-dash__send-footer">
-
-        <div className="capacity-dash__send-selection">
-          {selectedChannelIds.length} selected
-        </div>
-
-        <div className="capacity-dash__send-actions">
-
-          <button
-            className="capacity-dash__btn"
-            type="button"
-            onClick={closeSendModal}
-            disabled={sendingPdf}
-          >
-            Cancel
-          </button>
-
-          <button
-            className="capacity-dash__btn capacity-dash__btn--primary"
-            type="button"
-            onClick={sendCapacityPdf}
-            disabled={
-              channelsLoading ||
-              !selectedChannelIds.length ||
-              sendingPdf
-            }
-          >
-            {sendingPdf
-              ? "Generating & Sending…"
-              : "Send Report"}
-          </button>
-
-        </div>
-
-      </footer>
-    </section>
+    <p className="capacity-dash__send-section-description">
+      {!selectedSenderAccount
+        ? "Select a sender account first."
+        : "Choose one or more communication channels for this report."}
+    </p>
   </div>
-)}
 
-      
+  {selectedSenderAccount && (
+    <span className="capacity-dash__recipient-count">
+      {selectedChannelIds.length} selected
+    </span>
+  )}
+</div>
+
+                    {!selectedSenderAccount ? (
+                      <div className="capacity-dash__send-empty">
+                        Select a sender account to view compatible recipients.
+                      </div>
+                    ) : compatibleChannels.length === 0 ? (
+                      <div className="capacity-dash__send-empty">
+                        No compatible communication channels are available for
+                        this sender account.
+                      </div>
+                    ) : (
+                      <div className="capacity-dash__channel-list">
+                        {compatibleChannels.map((channel) => (
+                          <label
+                            className={`capacity-dash__channel ${
+                              selectedChannelIds.includes(channel.id)
+                                ? "capacity-dash__channel--selected"
+                                : ""
+                            }`}
+                            key={channel.id}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedChannelIds.includes(channel.id)}
+                              onChange={() =>
+                                toggleChannelSelection(channel.id)
+                              }
+                              disabled={sendingPdf}
+                            />
+
+                            <div className="capacity-dash__channel-main">
+                              <div className="capacity-dash__channel-name">
+                                {channel.name}
+                              </div>
+
+                              <div className="capacity-dash__channel-value">
+                                {channel.value}
+                              </div>
+
+                              <div className="capacity-dash__channel-meta">
+                                <span className="capacity-dash__channel-type">
+                                  {channel.type}
+                                </span>
+                              </div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </>
+              )}
+            </div>
+
+            <footer className="capacity-dash__send-footer">
+              {/* <div className="capacity-dash__send-selection">
+          {selectedChannelIds.length} selected
+        </div> */}
+              <div className="capacity-dash__send-selection">
+                <div>
+                  Sender:{" "}
+                  <strong>
+                    {selectedSenderAccount
+                      ? selectedSenderAccount.label
+                      : "Not selected"}
+                  </strong>
+                </div>
+
+                <div>Recipients: {selectedChannelIds.length}</div>
+              </div>
+
+              <div className="capacity-dash__send-actions">
+                <button
+                  className="capacity-dash__btn"
+                  type="button"
+                  onClick={closeSendModal}
+                  disabled={sendingPdf}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  className="capacity-dash__btn capacity-dash__btn--primary"
+                  type="button"
+                  onClick={sendCapacityPdf}
+                  disabled={
+                    channelsLoading ||
+                    !selectedAccountId ||
+                    !selectedChannelIds.length ||
+                    !sendSubject.trim() ||
+                    !sendBody.trim() ||
+                    sendingPdf
+                  }
+                >
+                  {sendingPdf ? "Generating & Sending…" : "Send Report"}
+                </button>
+              </div>
+            </footer>
+          </section>
+        </div>
+      )}
 
       {printing && (
         <PrintReport
@@ -2542,23 +2717,21 @@ const sendCapacityPdf = async () => {
       )}
 
       {sendReportReady && (
-  <div
-    ref={sendReportRef}
-    className="capacity-dash__send-report-capture"
-    aria-hidden="true"
-  >
-    <PrintReport
-      payload={payload}
-      rows={rows}
-      gaps={gaps}
-      stats={STATS}
-      periodText={periodText}
-      theme="light"
-    />
-  </div>
-)}
-
-      
+        <div
+          ref={sendReportRef}
+          className="capacity-dash__send-report-capture"
+          aria-hidden="true"
+        >
+          <PrintReport
+            payload={payload}
+            rows={rows}
+            gaps={gaps}
+            stats={STATS}
+            periodText={periodText}
+            theme="light"
+          />
+        </div>
+      )}
     </div>
   );
 }
