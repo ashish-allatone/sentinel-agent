@@ -154,8 +154,7 @@ async def get_available_services(agent_name: str = Query() ,  db: AsyncSession =
             "service_name" : s.service_name,
             "is_enable" : s.is_active
         }
-        if curr_services.get(engine):
-            curr_services[engine].append(this_service)
+        curr_services[engine].append(this_service)
 
     data_res = AvailableEnginesResponse(available_engines=curr_services)
     return standard_success_response(data = data_res , message = "Available services fetched successfully")
