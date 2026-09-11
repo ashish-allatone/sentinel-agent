@@ -148,6 +148,7 @@ async def get_available_services(agent_name: str = Query() ,  db: AsyncSession =
 
     curr_services = {e : [] for e in engines}
     for s in res:
+        print(s.service_name)
         engine = s.engine
         this_service = {
             "service_name" : s.service_name,
