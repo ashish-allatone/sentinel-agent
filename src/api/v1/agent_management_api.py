@@ -146,32 +146,17 @@ async def get_available_services(agent_name: str = Query() ,  db: AsyncSession =
     res = await db.execute(select(CredentialStorage).where(CredentialStorage.agent_name == agent_name))
     res = res.scalars().all()
 
-    curr_services = {}
-    ser_list = []
+    curr_services = {e : [] for e in engines}
     for s in res:
-        this_ser = {
+        engine = s.engine
+        this_service = {
             "service_name" : s.service_name,
-            "username" : s.user_name,
-            "password" : s.password_enc,
             "is_enable" : s.is_active
         }
-        curr_services[s.agent_name] = this_ser
-        ser_list.append(s.agent_name)
+        if curr_services.get(engine):
+            curr_services[engine].append(this_service)
 
-    engines_list = []
-
-    for en in engines:
-        this_en = AvailableEngines(engine = en )
-        if en in ser_list:
-            curr_ser = curr_services.get(en)
-            this_en.service_name = curr_ser.get("service_name")
-            this_en.username = curr_ser.get("username")
-            this_en.password = curr_ser.get("password")
-            this_en.is_enable = curr_ser.get("is_enable")
-        
-        engines_list.append(this_en)
-
-    data_res = AvailableEnginesResponse(available_engines=engines_list)
+    data_res = AvailableEnginesResponse(available_engines=curr_services)
     return standard_success_response(data = data_res , message = "Available services fetched successfully")
 
 

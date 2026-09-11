@@ -71,7 +71,7 @@ class AvailableEngines(BaseModel):
     is_enable : Optional[bool] = False
 
 class AvailableEnginesResponse(BaseModel):
-    available_engines : list[AvailableEngines]
+    available_engines : dict
 
 class IsValidAgentNameResponse(BaseModel):
     valid : bool
