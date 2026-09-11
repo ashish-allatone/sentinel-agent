@@ -94,11 +94,11 @@ class AddCredentialRequest(BaseModel):
     engine: str = Field(..., description="mysql | mariadb | postgresql | oracle | redis | mongodb")
     user_name: Optional[str] = Field(None, max_length=255)
     password: Optional[str] = Field(None, description="stored encrypted, never returned")
-    service_name: Optional[str] = Field(None, description="Oracle service name / SID")
+    service_name: str = Field(None, description="Oracle service name / SID")
     dbname: Optional[str] = Field(None, description="mysql / postgres / mongo database")
     host: str = "127.0.0.1"
     port: Optional[int] = None
-    agent_name: Optional[str] = None
+    agent_name: str = None
  
     @field_validator("engine")
     @classmethod

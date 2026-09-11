@@ -3,7 +3,8 @@ from typing import Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 
-VALID_ENGINES = {"postgresql", "mysql", "mariadb", "oracle", "redis", "mongodb"}
+VALID_ENGINES = {"postgresql", "mysql", "mariadb", "oracle", "redis", "mongodb" , "sqlserver" ,
+                 "nginx" , "apache" , "httpd" , "nginx.exe" , "jboss" , "wildfly"}
 _ALIAS = {"postgres": "postgresql", "pg": "postgresql", "psql": "postgresql",
           "mongo": "mongodb"}
 

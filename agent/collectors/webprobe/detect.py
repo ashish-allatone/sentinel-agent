@@ -55,7 +55,7 @@ def detect_process_servers() -> List[Dict[str, Any]]:
             ports = _listening_ports(pid)
             # keep the first (usually master) process per server, enrich ports
             row = found.setdefault(server, {
-                "server": server, "engine": "webserver",
+                "engine": server,
                 "running": True, "pid": pid,
                 "exe_path": proc.info.get("exe"),
                 "host": "127.0.0.1",
@@ -136,8 +136,7 @@ def detect_docker_servers() -> List[Dict[str, Any]]:
             continue
         headline = 443 if 443 in ports else (80 if 80 in ports else ports[0])
         rows.append({
-            "server": server,
-            "engine": "webserver",
+            "engine": server,
             "running": True,
             "pid": None,
             "exe_path": None,

@@ -13,7 +13,6 @@ from collectors.usb_collector import USBCollector
 from collectors.capacity_monitoring_collector import ResourceCollector
 from collectors.engines_handler import EnginesHandler
 from collectors.web_inspector import WebInspector
-from collectors.fly_inspector import FlyInspector
 from collectors.appserver_inspector import AppServerInspector
 
 from utils.utils import get_machine_info
@@ -93,8 +92,6 @@ class SentinelAgent:
         # --- on-demand inspectors (driven by start_*/stop_* commands) ---------
         self._add_handler("Appserver_inspector",
                           lambda: AppServerInspector(dispatch, machine_info=mi))
-        self._add_handler("fly_inspector",
-                          lambda: FlyInspector(dispatch, machine_info=mi, interval=60))
         self._add_handler("engines_handler",
                           lambda: EnginesHandler(dispatch=dispatch, machine_info=mi))
         self._add_handler("web_inspector",

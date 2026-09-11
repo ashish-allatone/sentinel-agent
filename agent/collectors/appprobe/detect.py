@@ -52,7 +52,7 @@ def detect_appservers() -> List[Dict[str, Any]]:
                 cli_path = find_cli()
             key = f"{product}:{mgmt}"
             found.setdefault(key, {
-                "server": product, "engine": "appserver",
+                "engine": "product",
                 "running": True, "pid": pid,
                 "exe_path": exe,
                 "jboss_home": home,
