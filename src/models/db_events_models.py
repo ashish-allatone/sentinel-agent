@@ -16,6 +16,7 @@ class DbEventCommon:
     id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     # agent_id=Column(Integer, nullable=False, index=True)
     agent_name = Column(String, nullable=False, index=True)
+    service_name = Column(String, nullable=False, index=True)
     engine = Column(String, nullable=False)
     action = Column(String, nullable=False)
     outcome = Column(String)
