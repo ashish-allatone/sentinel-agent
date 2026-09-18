@@ -323,7 +323,7 @@ def inspect(params: Dict[str, Any]) -> Dict[str, Any]:
             "alert_log_errors":    sec.get("alert_log_errors"),
         },
     }
-    return {"db_version": cv.get("version"), "current_database": cv.get("current_database"), "points": points}
+    # return {"db_version": cv.get("version"), "current_database": cv.get("current_database"), "points": points}
 
     return {"version": cv.get("version"), "database_count": len(databases),
             "table_count": table_count, "total_size_bytes": hs.get("total_size_bytes"),
