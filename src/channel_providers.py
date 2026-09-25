@@ -66,7 +66,8 @@ def _smtp_send_with_attachment_sync(host, port, user, password, sender, recipien
             # logger.info("Email sent successfully")
 
     except smtplib.SMTPException as e:
-        logger.error(f"Failed to send email via SMTP: {str(e)}")
+        print(f"Failed to send email via SMTP: {str(e)}")
+        # logger.error(f"Failed to send email via SMTP: {str(e)}")
         raise
 
 async def verify_gmail(creds: dict) -> str:
