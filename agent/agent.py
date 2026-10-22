@@ -1,8 +1,7 @@
 import threading
 import time
 
-from config.config import SEVERITY_ORDER
-
+from config.config import SEVERITY_ORDER, SEVERITY_RANK
 from output.writer import EventDispatcher
 from collectors.file_collector import FileCollector
 from collectors.auth_collector import create_auth_collector
@@ -35,26 +34,36 @@ class SentinelAgent:
     # ----------------------------------------------------------------- setup --
 
     def _build_dispatcher(self):
-        cfg = self.config["output"]
+        cfg = self.config.get("output") or {}
         return EventDispatcher(stdout=cfg.get("stdout", False))
 
     def _make_dispatch(self):
         """Returns a filtered dispatch function."""
-        cfg = self.config.get("filters", {})
-        min_sev_str = cfg.get("min_severity", "info")
-        min_sev_idx = SEVERITY_ORDER.index(min_sev_str) if min_sev_str in SEVERITY_ORDER else 0
-        excl_cats = set(cfg.get("exclude_categories", []))
-        excl_actions = set(cfg.get("exclude_actions", []))
+        cfg = self.config.get("filters") or {}
+
+        min_sev_str = str(cfg.get("min_severity") or "info").lower()
+        if min_sev_str not in SEVERITY_RANK:
+            print(f"[filters] Unknown min_severity {min_sev_str!r}, using 'info'")
+            min_sev_str = "info"
+        min_rank = SEVERITY_RANK[min_sev_str]
+
+        excl_cats = set(cfg.get("exclude_categories") or [])
+        excl_actions = set(cfg.get("exclude_actions") or [])
 
         def dispatch(event_dict: dict, machine_info):
-            sev = event_dict.get("severity", "info")
-            if SEVERITY_ORDER.index(sev) < min_sev_idx:
-                return
-            if event_dict.get("category") in excl_cats:
-                return
-            if event_dict.get("action") in excl_actions:
-                return
-            self._dispatcher.push(event_dict, machine_info)
+            try:
+                sev = str(event_dict.get("severity") or "info").lower()
+                # Unknown severities are let through instead of crashing
+                if SEVERITY_RANK.get(sev, min_rank) < min_rank:
+                    return
+                if event_dict.get("category") in excl_cats:
+                    return
+                if event_dict.get("action") in excl_actions:
+                    return
+                self._dispatcher.push(event_dict, machine_info)
+            except Exception as e:
+                # Never let one bad event kill the collector thread
+                print(f"[dispatch] Failed to dispatch event: {e!r}")
 
         return dispatch
 
@@ -101,9 +110,13 @@ class SentinelAgent:
         self._add_collector("Resource collector", lambda: ResourceCollector(
             dispatch=dispatch, machine_info=mi, poll_interval=10.0))
 
+        file_cfg = self.config.get("collectors", {}).get("file", {})
         self._add_collector("File collector", lambda: FileCollector(
-            dispatch=dispatch, machine_info=mi, watch_paths=None,
-            ignore_dirs=None, recursive=True, use_polling=False))
+            dispatch=dispatch, machine_info=mi,
+            watch_paths=file_cfg.get("watch_paths"),
+            ignore_dirs=file_cfg.get("ignore_dirs"),
+            recursive=file_cfg.get("recursive", True),
+            use_polling=file_cfg.get("use_polling", False)))
 
         self._add_collector("Auth collector", lambda: create_auth_collector(
             dispatch=dispatch, machine_info=mi))
